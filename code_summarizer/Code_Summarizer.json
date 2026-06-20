@@ -1,0 +1,374 @@
+{
+  "name": "Course_Summarizer",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            },
+            {}
+          ]
+        },
+        "simple": false,
+        "filters": {
+          "sender": "hannanfaisal0507@gmail.com"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -656,
+        -176
+      ],
+      "id": "6e24bbb0-3097-438f-bf7d-3da5ccb6f4bc",
+      "name": "Gmail Trigger1",
+      "alwaysOutputData": false,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "OFz5cdXaB6JhKH7B",
+          "name": "Gmail account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-5-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        -272,
+        -80
+      ],
+      "id": "3e5e4fde-94e3-4424-b22a-112914348d47",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "QNOIcLMW7cMGjMl5",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Given the code below\nCode: {{ $json.text }} generate comments for the code so i can understand what each line of code does(do not modify the existing code lines at all just add the comments wherever required)",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "you are a helpful assistant and know how to write code in c++ and you can help me to understanding the code by adding the comments to it"
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        -272,
+        -256
+      ],
+      "id": "02a98632-9f22-4fe8-a1a4-e025b55bcd69",
+      "name": "Comments_Addition"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-5-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        -272,
+        240
+      ],
+      "id": "49cbfb7b-4ce4-4904-a025-d73cddd56e76",
+      "name": "OpenAI Chat Model1",
+      "credentials": {
+        "openAiApi": {
+          "id": "QNOIcLMW7cMGjMl5",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Given the code below\nCode: {{ $json.text }} generate a summary of what this code does in very simple language. Do note that summary should contain all the important details there are in the code so i know what the code is about in a quick glance.",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "you are a expert in c++ code you have the ability to summarize the code into simple language and have the knack to cover important details in the summary"
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        -272,
+        64
+      ],
+      "id": "f35c7e7d-866c-4328-b216-0788d2bfbef5",
+      "name": "Code Summary"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        208,
+        -64
+      ],
+      "id": "1b7590e7-8487-4b8b-b0c5-4e67d8d22e2d",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "fieldsToAggregate": {
+          "fieldToAggregate": [
+            {}
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        416,
+        -64
+      ],
+      "id": "e7956c57-69e6-4c1c-bfa1-5fa9fa37b6f3",
+      "name": "Aggregate"
+    },
+    {
+      "parameters": {
+        "sendTo": "hannanfaisal0507@gmail.com",
+        "subject": "Code Summary and Comments",
+        "emailType": "text",
+        "message": "Code with comments:\n\nCode with Summary:",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1168,
+        -48
+      ],
+      "id": "87639add-a9e7-4b87-9ed8-164ad2b7422b",
+      "name": "Send a message",
+      "webhookId": "026eaa5e-0e34-4cd9-94e5-88f1e41fbcc3",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "OFz5cdXaB6JhKH7B",
+          "name": "Gmail account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        624,
+        -64
+      ],
+      "id": "0480a895-01a9-428b-880d-056b11292ddf",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-5-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        816,
+        176
+      ],
+      "id": "75106f2f-0ca0-4ba6-81a3-57d96d62b482",
+      "name": "OpenAI Chat Model2",
+      "credentials": {
+        "openAiApi": {
+          "id": "QNOIcLMW7cMGjMl5",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Given the code below\nCode: {{ $json.text }} generate a summary of what this code does in very simple language. Do note that summary should contain all the important details there are in the code so i know what the code is about in a quick glance.",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "you are a expert in c++ code you have the ability to summarize the code into simple language and have the knack to cover important details in the summary"
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        816,
+        -48
+      ],
+      "id": "a1797bce-855e-464d-a74e-8657ec0a9bdd",
+      "name": "Code Summary1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Gmail Trigger1": {
+      "main": [
+        [
+          {
+            "node": "Comments_Addition",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Code Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Comments_Addition",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Code Summary",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Comments_Addition": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code Summary": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Aggregate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model2": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Code Summary1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Code Summary1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code Summary1": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "e6ccb839-f747-4292-aaa6-a7807970ff2d",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "1a40683457e603ad542c68c27986b0ff886ecf8cf9f5803c80b8830c6ee86d04"
+  },
+  "id": "0ElbxoRRKy5bFF37",
+  "tags": []
+}
