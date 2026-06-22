@@ -1,0 +1,475 @@
+{
+  "name": "Lead Capture → CRM Pipeline",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "new-lead",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "d1498d2d-6ac4-4ded-876d-abfd8a10a34a",
+      "name": "Webhook — Receive Form",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -16,
+        -16
+      ],
+      "webhookId": "lead-capture-webhook"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "Lead received. Thank you!",
+        "options": {}
+      },
+      "id": "25856264-9461-4d0b-b6b0-5dc1799a5024",
+      "name": "Respond to Form",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        0,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "fields": {
+          "values": [
+            {
+              "name": "name",
+              "stringValue": "={{ $json.body.name }}"
+            },
+            {
+              "name": "email",
+              "stringValue": "={{ $json.body.email }}"
+            },
+            {
+              "name": "phone",
+              "stringValue": "={{ $json.body.phone }}"
+            },
+            {
+              "name": "company",
+              "stringValue": "={{ $json.body.company }}"
+            },
+            {
+              "name": "message",
+              "stringValue": "={{ $json.body.message }}"
+            },
+            {
+              "name": "source",
+              "stringValue": "={{ $json.body.source }}"
+            }
+          ]
+        },
+        "include": "selected",
+        "options": {}
+      },
+      "id": "1dca436b-e45b-46ee-98e4-072d247964a3",
+      "name": "Set — Map & Clean Fields",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3,
+      "position": [
+        224,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.groq.com/openai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama-3.3-70b-versatile\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are a lead qualification assistant for a sales team. You analyze incoming leads and return a JSON object only.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Analyze this lead and respond with a JSON object in this exact format:\\n{\\n  \\\"score\\\": \\\"Hot\\\" or \\\"Warm\\\" or \\\"Cold\\\",\\n  \\\"priority\\\": a number 1-10,\\n  \\\"reason\\\": \\\"One sentence explanation\\\",\\n  \\\"follow_up\\\": \\\"Suggested first message to send this lead\\\"\\n}\\n\\nLead info:\\nName: {{ $json.name }}\\nCompany: {{ $json.company }}\\nEmail: {{ $json.email }}\\nMessage: {{ $json.message }}\\nSource: {{ $json.source }}\"\n    }\n  ],\n  \"temperature\": 0.3,\n  \"max_tokens\": 300,\n  \"response_format\": { \"type\": \"json_object\" }\n}",
+        "options": {}
+      },
+      "id": "51239612-0043-46f5-aca5-826f3e14eb5b",
+      "name": "Gemini — Score Lead",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        448,
+        176
+      ],
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "AR2IHblruf7ubsku",
+          "name": "Gemini API Key"
+        },
+        "httpHeaderAuth": {
+          "id": "TZziUn7tAvEHQheq",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const lead = $('Set — Map & Clean Fields').first().json;\n\n// Groq (OpenAI-compatible) response structure: choices[0].message.content\n// response_format: { type: 'json_object' } guarantees this is clean JSON,\n// no markdown fences to strip — but we keep a fallback in case the call\n// itself errors or returns something unexpected.\nconst groqResponse = $input.first().json;\nconst rawText = groqResponse?.choices?.[0]?.message?.content ?? '{}';\n\nlet ai;\ntry {\n  ai = JSON.parse(rawText);\n} catch (e) {\n  ai = { score: 'Warm', priority: 5, reason: 'Could not parse AI response', follow_up: 'Follow up with a friendly intro email.' };\n}\n\nreturn [{\n  json: {\n    ...lead,\n    lead_score: ai.score,\n    lead_priority: ai.priority,\n    lead_reason: ai.reason,\n    follow_up_suggestion: ai.follow_up,\n    submitted_at: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "fbc1ddf3-77cc-4f1d-9960-dbf875ed5270",
+      "name": "Code — Merge Lead + AI Score",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "appToken",
+        "email": "={{ $json.email }}",
+        "additionalFields": {
+          "companyName": "={{ $json.company }}",
+          "firstName": "={{ $json.name }}",
+          "phoneNumber": "={{ $json.phone }}"
+        },
+        "options": {}
+      },
+      "id": "b71dd72e-2c33-4734-9772-b0e544565de9",
+      "name": "HubSpot — Create Contact",
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2,
+      "position": [
+        880,
+        32
+      ],
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "dajcpfshd3r4ocCx",
+          "name": "HubSpot account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "=Thanks for reaching out, {{ $json.name.split(' ')[0] }}!",
+        "message": "=<html><body style=\"font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;\">\n<p>Hi {{ $json.name.split(' ')[0] }},</p>\n\n<p>Thanks for getting in touch! We've received your message and someone from our team will be back to you shortly.</p>\n\n<p>Here's a quick summary of what you sent us:</p>\n\n<blockquote style=\"background: #f5f5f5; padding: 12px 16px; border-left: 4px solid #4A90E2; margin: 16px 0;\">\n  <em>\"{{ $json.message }}\"</em>\n</blockquote>\n\n<p>In the meantime, feel free to reply to this email if you have any questions.</p>\n\n<p>Talk soon,<br/>\n<strong>The Team</strong></p>\n</body></html>",
+        "options": {}
+      },
+      "id": "b3b8229c-ecb2-43f7-acd8-c82fcc966c41",
+      "name": "Gmail — Welcome Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [
+        880,
+        176
+      ],
+      "webhookId": "d5f54b77-8c09-477f-a66f-3771cd897b7a",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "OFz5cdXaB6JhKH7B",
+          "name": "Gmail account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "#all-hannan-crew",
+          "mode": "name"
+        },
+        "text": "=:bell: *New Lead Incoming!*\n\n*Name:* {{ $json.name }}\n*Email:* {{ $json.email }}\n*Company:* {{ $json.company }}\n*Phone:* {{ $json.phone }}\n\n*Message:*\n> {{ $json.message }}\n\n*AI Score:* {{ $json.lead_score }} ({{ $json.lead_priority }}/10)\n*Reason:* {{ $json.lead_reason }}\n\n*Suggested follow-up:*\n> {{ $json.follow_up_suggestion }}\n\n_Submitted: {{ $json.submitted_at }}_",
+        "otherOptions": {}
+      },
+      "id": "de04813f-264c-435b-b2f9-e91d83284788",
+      "name": "Slack — Notify Sales Team",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2,
+      "position": [
+        880,
+        320
+      ],
+      "webhookId": "aa5fa829-8d20-4cda-aa6a-43a57969e826",
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "va25UDMUxfEJA9jA",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "16rFgBuEdAOYSuH5lS6kv2LTd801F5XwR4TkNuqsvmFE",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Leads",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/16rFgBuEdAOYSuH5lS6kv2LTd801F5XwR4TkNuqsvmFE/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Timestamp": "={{ $json.submitted_at }}",
+            "Name": "={{ $json.name }}",
+            "Email": "={{ $json.email }}",
+            "Phone": "={{ $json.phone }}",
+            "Company": "={{ $json.company }}",
+            "Message": "={{ $json.message }}",
+            "Source": "={{ $json.source }}",
+            "AI Score": "={{ $json.lead_score }}",
+            "Priority": "={{ $json.lead_priority }}",
+            "AI Reason": "={{ $json.lead_reason }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Timestamp",
+              "displayName": "Timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Phone",
+              "displayName": "Phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Company",
+              "displayName": "Company",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Message",
+              "displayName": "Message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Source",
+              "displayName": "Source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "AI Score",
+              "displayName": "AI Score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Priority",
+              "displayName": "Priority",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "AI Reason",
+              "displayName": "AI Reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "eec087ed-7a59-4bd4-9b73-0e5c6f538a18",
+      "name": "Google Sheets — Log Lead",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        880,
+        464
+      ],
+      "credentials": {
+        "googleApi": {
+          "id": "FxyM9wDdowuRmuq0",
+          "name": "Google Sheets account 2"
+        }
+      }
+    }
+  ],
+  "pinData": {
+    "Webhook — Receive Form": [
+      {
+        "json": {
+          "headers": {
+            "user-agent": "Mozilla/5.0 (Windows NT; Windows NT 10.0; en-US) WindowsPowerShell/5.1.26100.8655",
+            "content-type": "application/json",
+            "host": "localhost:5678",
+            "content-length": "199",
+            "expect": "100-continue",
+            "connection": "Keep-Alive"
+          },
+          "params": {},
+          "query": {},
+          "body": {
+            "name": "Ahmed Khan",
+            "email": "your-real-email@gmail.com",
+            "phone": "+92 300 1234567",
+            "company": "Khan Enterprises",
+            "message": "I need help automating my sales process",
+            "source": "Website Form"
+          },
+          "webhookUrl": "http://localhost:5678/webhook-test/new-lead",
+          "executionMode": "test"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ],
+    "Set — Map & Clean Fields": [
+      {
+        "json": {
+          "name": "Ahmed Khan",
+          "email": "your-real-email@gmail.com",
+          "phone": "+92 300 1234567",
+          "company": "Khan Enterprises",
+          "message": "I need help automating my sales process",
+          "source": "Website Form"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Webhook — Receive Form": {
+      "main": [
+        [
+          {
+            "node": "Respond to Form",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Set — Map & Clean Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set — Map & Clean Fields": {
+      "main": [
+        [
+          {
+            "node": "Gemini — Score Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini — Score Lead": {
+      "main": [
+        [
+          {
+            "node": "Code — Merge Lead + AI Score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code — Merge Lead + AI Score": {
+      "main": [
+        [
+          {
+            "node": "HubSpot — Create Contact",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Gmail — Welcome Email",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Slack — Notify Sales Team",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Google Sheets — Log Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "f58c61f4-255c-49ba-b872-80d20ff6e761",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "1a40683457e603ad542c68c27986b0ff886ecf8cf9f5803c80b8830c6ee86d04"
+  },
+  "id": "0HP7QiLIqHsASLPP",
+  "tags": []
+}
