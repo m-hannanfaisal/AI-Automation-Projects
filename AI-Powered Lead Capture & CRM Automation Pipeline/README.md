@@ -4,7 +4,7 @@ An end-to-end automation that captures inbound leads, scores and qualifies them 
 
 Built with **n8n**, **Groq (Llama 3.3)**, and native integrations with **HubSpot**, **Gmail**, **Slack**, and **Google Sheets**.
 
-![Workflow Architecture](./Lead_Capture → CRM_Pipeline.jpeg)
+![Workflow Architecture](./Lead_Capture%20-CRM_Pipeline.jpeg)
 
 ---
 
