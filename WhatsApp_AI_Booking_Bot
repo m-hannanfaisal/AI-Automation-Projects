@@ -1,0 +1,690 @@
+{
+  "name": "WhatsApp AI Booking Bot",
+  "nodes": [
+    {
+      "parameters": {
+        "multipleMethods": true,
+        "httpMethod": [
+          "POST"
+        ],
+        "path": "whatsapp-bot",
+        "responseMode": "responseNode",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "ngrok-skip-browser-warning",
+                "value": "true"
+              }
+            ]
+          }
+        }
+      },
+      "id": "e7113533-1f23-4c88-93b7-013e25d00fe9",
+      "name": "Webhook — Receive WhatsApp",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -880,
+        80
+      ],
+      "webhookId": "whatsapp-bot-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body;\nconst query = $input.first().json.query;\n\n// META WEBHOOK VERIFICATION (GET request)\n// When you first set up the webhook in Meta dashboard,\n// Meta sends a GET request to verify. This handles it.\nif (query && query['hub.mode'] === 'subscribe') {\n  // Return the challenge token — Meta checks this\n  // You must set VERIFY_TOKEN to match what you enter in Meta dashboard\n  const VERIFY_TOKEN = 'my_whatsapp_verify_token_123';\n  if (query['hub.verify_token'] === VERIFY_TOKEN) {\n    return [{ json: { challenge: query['hub.challenge'], isVerification: true } }];\n  } else {\n    throw new Error('Webhook verification failed — token mismatch');\n  }\n}\n\n// NORMAL MESSAGE — extract data from Meta's nested structure\ntry {\n  const entry = body.entry?.[0];\n  const change = entry?.changes?.[0];\n  const value = change?.value;\n  const message = value?.messages?.[0];\n\n  if (!message) {\n    // Could be a status update (delivered, read) — ignore silently\n    return [{ json: { isStatusUpdate: true, skip: true } }];\n  }\n\n  const senderPhone = message.from;\n  const messageText = message.text?.body ?? '';\n  const messageId = message.id;\n  const senderName = value?.contacts?.[0]?.profile?.name ?? 'Friend';\n  const phoneNumberId = value?.metadata?.phone_number_id;\n\n  return [{\n    json: {\n      isVerification: false,\n      isStatusUpdate: false,\n      skip: false,\n      senderPhone,\n      senderName,\n      messageText,\n      messageId,\n      phoneNumberId\n    }\n  }];\n} catch (e) {\n  throw new Error('Failed to parse WhatsApp message: ' + e.message);\n}"
+      },
+      "id": "d3c3ee50-6042-4d8e-90c7-efbc782c14ea",
+      "name": "Code — Extract Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -656,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.isVerification ? $json.challenge : 'OK' }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "88f237c7-0881-4a06-ada5-c8d86d545d1d",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        -656,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "skip-check",
+              "leftValue": "={{ $json.skip }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "notEquals"
+              }
+            },
+            {
+              "id": "verification-check",
+              "leftValue": "={{ $json.isVerification }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "38f034bd-fc11-42ae-ad4d-884290aa2312",
+      "name": "IF — Skip Non-Messages",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -448,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "booking-intent",
+              "leftValue": "={{ $json.messageText.toLowerCase() }}",
+              "rightValue": "book|appointment|schedule|available|availability|slot|reserve|meeting|session|visit|tomorrow|today|monday|tuesday|wednesday|thursday|friday|saturday|sunday|morning|afternoon|evening|pm|am|o'clock",
+              "operator": {
+                "type": "string",
+                "operation": "regex"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "cfb77ee9-d4b5-4d68-8be1-93f5ec21b9a0",
+      "name": "IF — Booking Intent?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -224,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama-3.3-70b-versatile\",\n  \"temperature\": 0.7,\n  \"max_tokens\": 300,\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are a friendly and helpful WhatsApp assistant for a business. Keep replies short (2-4 sentences max) since this is WhatsApp. Be warm and conversational. If someone asks to book or schedule something, tell them to simply say the date and time they prefer and you will check availability.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"My name is {{ $json.senderName }}. My message: {{ $json.messageText }}\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "d63fa98d-7e5d-4598-adda-9b203bba2a63",
+      "name": "Groq — General Chat Reply",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        0,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "TZziUn7tAvEHQheq",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const groqResponse = $input.first().json;\nconst replyText = groqResponse?.choices?.[0]?.message?.content ?? \"Sorry, I couldn't process that. Please try again.\";\n\n// Pass along original sender info + the AI reply\nconst senderPhone = $('IF — Skip Non-Messages').first().json.senderPhone;\nconst phoneNumberId = $('IF — Skip Non-Messages').first().json.phoneNumberId;\n\nreturn [{ json: { replyText, senderPhone, phoneNumberId } }];"
+      },
+      "id": "0766818c-4ab0-4b1b-9921-bda73ef6a68d",
+      "name": "Code — Parse Chat Reply",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama-3.3-70b-versatile\",\n  \"temperature\": 0.1,\n  \"max_tokens\": 200,\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You extract booking details from WhatsApp messages. Today's date is {{ $now.toFormat('yyyy-MM-dd') }}. Today is a {{ $now.toFormat('cccc') }}.\\n\\nBUSINESS RULES (strictly enforce these):\\n- Working days: Monday to Saturday only. If customer requests Sunday, set date to null.\\n- Working hours: 10:00 to 18:30 only (last slot is 18:30). If requested time is outside this, set time to null.\\n- Slot duration: exactly 30 minutes.\\n- Valid slot times ONLY (on the hour or half hour): 10:00, 10:30, 11:00, 11:30, 12:00, 12:30, 13:00, 13:30, 14:00, 14:30, 15:00, 15:30, 16:00, 16:30, 17:00, 17:30, 18:00, 18:30\\n- Round requested time to nearest valid slot. Example: 2:10pm → 14:00, 2:20pm → 14:30, 3:45pm → 16:00\\n- For relative dates like 'tomorrow' or 'next Monday', calculate from today's date.\\n\\nReply ONLY with a valid JSON object — no markdown, no backticks, no explanation:\\n{\\n  \\\"date\\\": \\\"YYYY-MM-DD or null\\\",\\n  \\\"time\\\": \\\"HH:MM or null\\\",\\n  \\\"duration_minutes\\\": 30,\\n  \\\"name\\\": \\\"customer name or Unknown\\\",\\n  \\\"notes\\\": \\\"any extra details\\\",\\n  \\\"out_of_hours\\\": true or false,\\n  \\\"is_sunday\\\": true or false\\n}\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Customer name: {{ $json.senderName }}. Message: {{ $json.messageText }}\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "c859232b-99ae-4970-be57-ad82007d7cf8",
+      "name": "Groq — Extract Booking Details",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        0,
+        192
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "TZziUn7tAvEHQheq",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const groqResponse = $input.first().json;\nconst rawText = groqResponse?.choices?.[0]?.message?.content ?? '{}';\nconst cleaned = rawText.replace(/```json\\s*/gi, '').replace(/```\\s*/gi, '').trim();\n\n// ─── BUSINESS CONFIG ──────────────────────────────\nconst SLOT_DURATION_MIN = 30;\nconst WORK_START_HOUR = 10;    // 10:00 am\nconst WORK_END_HOUR = 18;      // last slot 18:30\nconst WORK_END_MIN = 30;\nconst VALID_SLOTS = [\n  '10:00','10:30','11:00','11:30','12:00','12:30',\n  '13:00','13:30','14:00','14:30','15:00','15:30',\n  '16:00','16:30','17:00','17:30','18:00','18:30'\n];\nconst WORK_DAYS = [1,2,3,4,5,6]; // Mon=1 ... Sat=6 (0=Sun)\n// ──────────────────────────────────────────────────\n\nlet booking;\ntry {\n  booking = JSON.parse(cleaned);\n} catch(e) {\n  booking = { date: null, time: null, duration_minutes: SLOT_DURATION_MIN, name: 'Unknown', notes: '', out_of_hours: false, is_sunday: false };\n}\n\nconst senderPhone = $('IF — Skip Non-Messages').first().json.senderPhone;\nconst phoneNumberId = $('IF — Skip Non-Messages').first().json.phoneNumberId;\nconst senderName = $('IF — Skip Non-Messages').first().json.senderName;\n\nlet startDateTime = null;\nlet endDateTime = null;\nlet isValid = false;\nlet invalidReason = null;\n\nif (booking.date && booking.time) {\n\n  // Snap time to nearest valid 30-min slot\n  const [hStr, mStr] = booking.time.split(':');\n  let h = parseInt(hStr);\n  let m = parseInt(mStr);\n  // Round to nearest 30\n  const totalMin = h * 60 + m;\n  const snappedMin = Math.round(totalMin / 30) * 30;\n  const snappedH = Math.floor(snappedMin / 60);\n  const snappedM = snappedMin % 60;\n  const snappedTime = `${String(snappedH).padStart(2,'0')}:${String(snappedM).padStart(2,'0')}`;\n\n  // Check it's a valid slot\n  const slotOk = VALID_SLOTS.includes(snappedTime);\n\n  // Check working day\n  const dateObj = new Date(`${booking.date}T${snappedTime}:00`);\n  const dayOfWeek = dateObj.getDay(); // 0=Sun\n  const dayOk = WORK_DAYS.includes(dayOfWeek);\n\n  if (!slotOk) {\n    invalidReason = 'out_of_hours';\n  } else if (!dayOk) {\n    invalidReason = 'sunday';\n  } else {\n    startDateTime = `${booking.date}T${snappedTime}:00`;\n    const endMs = new Date(startDateTime).getTime() + SLOT_DURATION_MIN * 60 * 1000;\n    endDateTime = new Date(endMs).toISOString().slice(0,19);\n    isValid = true;\n  }\n} else {\n  invalidReason = 'missing_datetime';\n}\n\nreturn [{\n  json: {\n    ...booking,\n    duration_minutes: SLOT_DURATION_MIN,\n    senderPhone,\n    phoneNumberId,\n    senderName,\n    startDateTime,\n    endDateTime,\n    isValid,\n    invalidReason\n  }\n}];"
+      },
+      "id": "ce909ef5-2bc8-4614-82c3-d9ebfa434961",
+      "name": "Code — Parse Booking Details",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "id": "valid-datetime",
+              "leftValue": "={{ $json.isValid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b103fd51-0e40-4bdc-995b-0afd863a7ce6",
+      "name": "IF — Valid Date/Time?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        448,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "value": "mfaisal.bscs24seecs@seecs.edu.pk",
+          "mode": "list",
+          "cachedResultName": "mfaisal.bscs24seecs@seecs.edu.pk"
+        },
+        "options": {
+          "singleEvents": true
+        }
+      },
+      "id": "2177b538-184a-4829-a5a5-4f75ed94e6fa",
+      "name": "Google Calendar — Check Availability",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1,
+      "position": [
+        672,
+        144
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "iFxjFctuEVqwPCCl",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const events = $input.all();\nconst bookingData = $('Code — Parse Booking Details').first().json;\n\n// If there are events in this time slot, it's busy\nconst isBusy = events.length > 0 && events[0].json.id !== undefined;\n\nreturn [{\n  json: {\n    ...bookingData,\n    isBusy,\n    conflictingEvent: isBusy ? events[0].json.summary : null\n  }\n}];"
+      },
+      "id": "7de25903-68ef-4a2b-bb79-92b03dddcc31",
+      "name": "Code — Is Slot Busy?",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "id": "busy-check",
+              "leftValue": "={{ $json.isBusy }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "9b4b013d-21a7-47a3-b514-4c9c3f8c419c",
+      "name": "IF — Slot Available?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1104,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "calendar": {
+          "__rl": true,
+          "value": "mfaisal.bscs24seecs@seecs.edu.pk",
+          "mode": "list",
+          "cachedResultName": "mfaisal.bscs24seecs@seecs.edu.pk"
+        },
+        "start": "={{ $json.startDateTime }}",
+        "end": "={{ $json.endDateTime }}",
+        "additionalFields": {
+          "description": "=Booked via WhatsApp\nCustomer: {{ $json.senderName }}\nPhone: {{ $json.senderPhone }}\nNotes: {{ $json.notes }}",
+          "location": "",
+          "summary": "=Appointment — {{ $json.name }}"
+        }
+      },
+      "id": "596946f8-1144-4c42-a291-fc918b08ac5b",
+      "name": "Google Calendar — Create Event",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1,
+      "position": [
+        1328,
+        80
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "iFxjFctuEVqwPCCl",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const bookingData = $('Code — Is Slot Busy?').first().json;\n\n// Format a friendly date/time for the WhatsApp reply\nconst dt = new Date(bookingData.startDateTime);\nconst dateStr = dt.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });\nconst timeStr = dt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });\n\nconst replyText = `✅ Booked! Your appointment is confirmed for:\\n📅 ${dateStr}\\n🕐 ${timeStr}\\n\\nYou'll receive a reminder before your appointment. See you then! 😊`;\n\nreturn [{\n  json: {\n    replyText,\n    senderPhone: bookingData.senderPhone,\n    phoneNumberId: bookingData.phoneNumberId\n  }\n}];"
+      },
+      "id": "fc781723-1d44-4565-a2b6-3773aeb29c2d",
+      "name": "Code — Build Confirmation Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1552,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const bookingData = $('IF — Slot Available?').first().json;\n\nconst dt = new Date(bookingData.startDateTime);\nconst dateStr = dt.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });\nconst timeStr = dt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });\n\nconst replyText = `Sorry, ${dateStr} at ${timeStr} is already booked. 😔\\n\\nOur available slots are every 30 minutes, Monday–Saturday from 10:00 AM to 7:00 PM.\\n\\nCould you suggest another time that works for you? 🙏`;\n\nreturn [{\n  json: {\n    replyText,\n    senderPhone: bookingData.senderPhone,\n    phoneNumberId: bookingData.phoneNumberId\n  }\n}];"
+      },
+      "id": "89a12ea2-3f61-46f4-99b6-a0502d3490ef",
+      "name": "Code — Build Busy Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1328,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const bookingData = $('IF — Valid Date/Time?').first().json;\n\nconst SLOTS_DISPLAY = '10:00 AM, 10:30 AM, 11:00 AM, 11:30 AM, 12:00 PM, 12:30 PM,\\n1:00 PM, 1:30 PM, 2:00 PM, 2:30 PM, 3:00 PM, 3:30 PM,\\n4:00 PM, 4:30 PM, 5:00 PM, 5:30 PM, 6:00 PM, 6:30 PM';\n\nlet replyText;\n\nif (bookingData.invalidReason === 'sunday') {\n  replyText = `Sorry ${bookingData.senderName}, we're closed on Sundays. 😊\\n\\nWe're open *Monday to Saturday, 10:00 AM – 7:00 PM*.\\n\\nWhich other day works for you?`;\n\n} else if (bookingData.invalidReason === 'out_of_hours') {\n  replyText = `Sorry, that time is outside our working hours. 🕐\\n\\nWe're available *Monday–Saturday* with 30-minute slots:\\n\\n${SLOTS_DISPLAY}\\n\\nWhich slot works for you?`;\n\n} else {\n  // missing date or time entirely\n  replyText = `Hi ${bookingData.senderName}! 👋 I'd love to book an appointment for you.\\n\\nWe're open *Monday–Saturday* with 30-minute slots from 10:00 AM to 7:00 PM:\\n\\n${SLOTS_DISPLAY}\\n\\nJust tell me the date and time! Example:\\n*Tomorrow at 2pm*\\n*Friday at 10:30am*`;\n}\n\nreturn [{\n  json: {\n    replyText,\n    senderPhone: bookingData.senderPhone,\n    phoneNumberId: bookingData.phoneNumberId\n  }\n}];"
+      },
+      "id": "f36f56be-b38f-4e89-b05f-103abbc4e40e",
+      "name": "Code — Build Clarification Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v19.0/{{ $json.phoneNumberId }}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer EAASYv08QSVYBRwbzXVsE78GjBLclTg1mq43aZBAkbIHTyXsTqLrRlFLGR5mD8N3P3wL8X8dod7qZCZCLP33ipdSTX4W3ZB2ZAcACDrzsmOif3w1bx0ZCSZCx3exTrmGn1CqkRASUfWpbuZC08IklirYKpxXqvSMBYERoDFCfSjlVpMAuUX2LSjAExIbdPNrVKfHBZCqAvFV9059SEZA3fy1IGJ64oHZCQ0MvJubBlSdrPaJZAUZBiufZBSq7gLTM38654ZA7naxHBhlhxttjZAOCyikuqaeHZCPgZD"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"messaging_product\": \"whatsapp\",\n  \"recipient_type\": \"individual\",\n  \"to\": \"{{ $json.senderPhone }}\",\n  \"type\": \"text\",\n  \"text\": {\n    \"preview_url\": false,\n    \"body\": \"{{ $json.replyText }}\"\n  }\n}",
+        "options": {}
+      },
+      "id": "b0932cfd-8316-4812-9fbe-b6284e118a59",
+      "name": "HTTP Request — Send WhatsApp Reply",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        2096,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\n\nreturn [{\n  json: {\n    senderPhone: data.senderPhone,\n    phoneNumberId: data.phoneNumberId,\n    replyText: data.replyText\n      .replace(/\\\\/g, '\\\\\\\\')\n      .replace(/\"/g, '\\\\\"')\n      .replace(/\\r\\n/g, '\\\\n')\n      .replace(/\\n/g, '\\\\n')\n      .replace(/\\r/g, '\\\\n')\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1792,
+        80
+      ],
+      "id": "19d8eed7-4faf-421f-bc3f-b8460c6ed8ec",
+      "name": "Code — Sanitize Reply"
+    }
+  ],
+  "pinData": {
+    "Code — Extract Message": [
+      {
+        "json": {
+          "isVerification": false,
+          "isStatusUpdate": false,
+          "skip": false,
+          "senderPhone": "923226609795",
+          "senderName": "Hannan Faisal",
+          "messageText": "I want to book an appointment tomorrow at 2pm",
+          "messageId": "wamid.test123",
+          "phoneNumberId": "1255275210992295"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Webhook — Receive WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Code — Extract Message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Code — Extract Message": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "IF — Skip Non-Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — Skip Non-Messages": {
+      "main": [
+        [
+          {
+            "node": "IF — Booking Intent?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — Booking Intent?": {
+      "main": [
+        [
+          {
+            "node": "Groq — Extract Booking Details",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Groq — General Chat Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq — General Chat Reply": {
+      "main": [
+        [
+          {
+            "node": "Code — Parse Chat Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code — Parse Chat Reply": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request — Send WhatsApp Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq — Extract Booking Details": {
+      "main": [
+        [
+          {
+            "node": "Code — Parse Booking Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code — Parse Booking Details": {
+      "main": [
+        [
+          {
+            "node": "IF — Valid Date/Time?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — Valid Date/Time?": {
+      "main": [
+        [
+          {
+            "node": "Google Calendar — Check Availability",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code — Build Clarification Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Calendar — Check Availability": {
+      "main": [
+        [
+          {
+            "node": "Code — Is Slot Busy?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code — Is Slot Busy?": {
+      "main": [
+        [
+          {
+            "node": "IF — Slot Available?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — Slot Available?": {
+      "main": [
+        [
+          {
+            "node": "Google Calendar — Create Event",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code — Build Busy Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Calendar — Create Event": {
+      "main": [
+        [
+          {
+            "node": "Code — Build Confirmation Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code — Build Confirmation Message": {
+      "main": [
+        [
+          {
+            "node": "Code — Sanitize Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code — Build Busy Message": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request — Send WhatsApp Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code — Build Clarification Message": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request — Send WhatsApp Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code — Sanitize Reply": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request — Send WhatsApp Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "e1bee465-e130-4b1b-b944-6c76264227da",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "1a40683457e603ad542c68c27986b0ff886ecf8cf9f5803c80b8830c6ee86d04"
+  },
+  "id": "HB5pvZ4mYDjnYNGf",
+  "tags": []
+}
