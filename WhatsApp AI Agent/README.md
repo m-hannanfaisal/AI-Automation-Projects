@@ -34,7 +34,10 @@ A customer sends a WhatsApp message like *"I want to book tomorrow at 2pm"* and 
 ![WhatsApp AI Booking Bot Output](whatsapp_bot.jpeg)
 
 ---
+### Live WhatsApp Output
+![Live booking confirmation on WhatsApp](output.jpeg)
 
+---
 
 ## 🛠️ Tech Stack
 
