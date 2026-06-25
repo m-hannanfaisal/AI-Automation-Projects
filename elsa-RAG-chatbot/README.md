@@ -187,7 +187,7 @@ User message
 ---
 ## 📸 Screenshot
 
-![Product Query](screenshots/elsa_o2.jpeg)
+![Product Query](elsa_o2.jpeg)
 
 ---
 
