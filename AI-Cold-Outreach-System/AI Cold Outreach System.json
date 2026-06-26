@@ -1,0 +1,816 @@
+{
+  "name": "AI Cold Outreach System",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 24
+            }
+          ]
+        }
+      },
+      "id": "b67b47cf-9450-47e7-941d-f32b588a678b",
+      "name": "Schedule Trigger (Daily)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -960,
+        128
+      ],
+      "notes": "Runs the outreach campaign once per day. Adjust interval as needed."
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "create",
+        "documentId": {
+          "__rl": true,
+          "value": "1PPQ1odX2VgvW0WNBMZ0zuGseCERgpnv167MAjNLnXMA",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "id": "eda5a862-5906-4484-a7d7-f35d4a175627",
+      "name": "Read Leads (Google Sheets)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        -736,
+        128
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleApi": {
+          "id": "FxyM9wDdowuRmuq0",
+          "name": "Google Sheets account 2"
+        }
+      },
+      "notes": "Reads leads with Status=Pending. Expected columns: Name, Company, Role, Email, Industry, LinkedIn, Website, Status, EmailSent, ReplyReceived, SentAt, Notes"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "969ef109-0338-41b1-bcdd-be1e2649e142",
+      "name": "Process One Lead at a Time",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -432,
+        128
+      ],
+      "alwaysOutputData": true,
+      "notes": "Prevents rate limiting by processing leads one at a time."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "check-email",
+              "leftValue": "={{ $json.Email }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            },
+            {
+              "id": "check-name",
+              "leftValue": "={{ $json.Name }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            },
+            {
+              "id": "check-status",
+              "leftValue": "={{ $json.Status }}",
+              "rightValue": "Pending",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "1408cbd0-d555-4d8b-91c4-7ed028cf81df",
+      "name": "Validate Lead Data",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -208,
+        112
+      ],
+      "notes": "Skips leads with missing email or name. Only proceeds if Status=Pending."
+    },
+    {
+      "parameters": {
+        "modelName": "=models/gemini-1.5-flash",
+        "options": {}
+      },
+      "id": "8f232f2f-d4b9-462c-bdef-0bb89a1dfa29",
+      "name": "AI Email Personalizer (Gemini)",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        32,
+        304
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "n99cRogNRPYYCDfD",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      },
+      "notes": "Uses Gemini Flash (free tier). Swap with OpenAI or Groq node if preferred."
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are an expert cold email copywriter. Write a highly personalized, professional cold outreach email.\n\nLead Information:\n- Name: {{ $json.Name }}\n- Company: {{ $json.Company }}\n- Role: {{ $json.Role }}\n- Industry: {{ $json.Industry }}\n- Website: {{ $json.Website }}\n- LinkedIn: {{ $json.LinkedIn }}\n- Notes/Context: {{ $json.Notes }}\n\nSender Information:\n- Your Name: [YOUR NAME]\n- Your Role: AI Automation Freelancer\n- Your Portfolio: github.com/m-hannanfaisal\n- Your Value Prop: I build AI automation workflows that save businesses 10+ hours/week\n\nEmail Requirements:\n1. Subject line must be curiosity-driven and specific to their industry (max 8 words)\n2. Opening line must reference something specific about their company or role — NO generic openers like \"I came across your profile\"\n3. Body must clearly state ONE concrete problem I solve for their industry\n4. Include ONE specific result or example (you may infer a plausible one based on industry)\n5. CTA must be a soft ask — one specific question, not \"let me know if interested\"\n6. Total length: 80-120 words MAX (not including subject)\n7. Tone: Confident, peer-to-peer, no fluff\n\nReturn ONLY valid JSON in this exact format (no markdown, no extra text):\n{\n  \"subject\": \"subject line here\",\n  \"body\": \"full email body here with line breaks as \\n\"\n}"
+      },
+      "id": "ecac655c-cb78-4124-b024-81f1b7972f7d",
+      "name": "Generate Personalized Email",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.5,
+      "position": [
+        32,
+        128
+      ],
+      "notes": "Generates subject + body JSON. Prompt is tuned for short, high-converting cold emails."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse AI response — handles both clean JSON and markdown-wrapped JSON\nconst rawText = $input.first().json.text || $input.first().json.response || '';\n\nlet cleanText = rawText\n  .replace(/```json\\n?/gi, '')\n  .replace(/```\\n?/gi, '')\n  .trim();\n\nlet parsed;\ntry {\n  parsed = JSON.parse(cleanText);\n} catch (e) {\n  // Fallback: try to extract JSON object from response\n  const match = cleanText.match(/\\{[\\s\\S]*\\}/);\n  if (match) {\n    parsed = JSON.parse(match[0]);\n  } else {\n    throw new Error('Could not parse AI response as JSON: ' + cleanText.substring(0, 200));\n  }\n}\n\n// Validate required fields\nif (!parsed.subject || !parsed.body) {\n  throw new Error('AI response missing subject or body fields');\n}\n\n// Pass through original lead data + generated email\nconst leadData = $('Validate Lead Data').first().json;\n\nreturn [{\n  json: {\n    ...leadData,\n    emailSubject: parsed.subject,\n    emailBody: parsed.body,\n    generatedAt: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "abe2a203-ea00-4b6a-b8c2-861a34fc600b",
+      "name": "Parse AI Email JSON",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        320,
+        128
+      ],
+      "notes": "Safely parses AI JSON output. Handles markdown-wrapped responses. Merges lead data with generated email."
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.Email }}",
+        "subject": "={{ $json.emailSubject }}",
+        "emailType": "text",
+        "message": "={{ $json.emailBody }}\n\n--\n[YOUR NAME]\nAI Automation Freelancer\ngithub.com/m-hannanfaisal\n[YOUR PHONE] | [YOUR WEBSITE]",
+        "options": {
+          "replyTo": "YOUR_EMAIL@gmail.com"
+        }
+      },
+      "id": "b5af42b7-78d5-4d5e-ac9e-69b2795cd299",
+      "name": "Send Email via Gmail",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        560,
+        128
+      ],
+      "webhookId": "34eefb88-4c9d-420c-bdd4-23a2ea07f4e4",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "OFz5cdXaB6JhKH7B",
+          "name": "Gmail account 3"
+        }
+      },
+      "notes": "Sends from your Gmail. Make sure Gmail OAuth2 credentials are connected. Set your reply-to email."
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1PPQ1odX2VgvW0WNBMZ0zuGseCERgpnv167MAjNLnXMA",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "lead1",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "2b8de60b-b733-4346-b5dd-2c83ab65a42e",
+      "name": "Mark as Sent in Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        752,
+        128
+      ],
+      "credentials": {
+        "googleApi": {
+          "id": "FxyM9wDdowuRmuq0",
+          "name": "Google Sheets account 2"
+        }
+      },
+      "notes": "Updates Status to 'Sent' and logs timestamp. Uses Email column as the unique key to match rows."
+    },
+    {
+      "parameters": {
+        "amount": 30
+      },
+      "id": "a0a710d3-8107-4068-81b0-fabeb01766bd",
+      "name": "Wait 30s (Rate Limit)",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        960,
+        128
+      ],
+      "webhookId": "0fe8d46e-0e1d-41fb-bd4f-91b140148a7a",
+      "notes": "Prevents Gmail sending limits. Gmail free = 500 emails/day. Keep this delay between sends."
+    },
+    {
+      "parameters": {},
+      "id": "7f789cda-8c6e-4fd9-903f-d5dea204a114",
+      "name": "Next Lead",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1184,
+        128
+      ],
+      "notes": "Loop back to SplitInBatches to process next lead."
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1PPQ1odX2VgvW0WNBMZ0zuGseCERgpnv167MAjNLnXMA",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "lead1",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [
+            "row_number"
+          ],
+          "schema": [
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "a96e41f5-7e69-430a-b353-19f51fd2f1b0",
+      "name": "Log Skipped Lead",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        48,
+        624
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleApi": {
+          "id": "FxyM9wDdowuRmuq0",
+          "name": "Google Sheets account 2"
+        }
+      },
+      "notes": "Marks invalid/incomplete leads so you can review and fix them."
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "reply-tracker",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "4efadb69-0400-42ed-bd81-815c93c218ae",
+      "name": "Reply Tracker Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -1008,
+        592
+      ],
+      "webhookId": "reply-tracker-webhook",
+      "notes": "Webhook URL to receive reply notifications. Can be triggered by Gmail watch via Google Cloud Pub/Sub, Zapier, or a polling script. POST body should include: { email, replyText, repliedAt }"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1PPQ1odX2VgvW0WNBMZ0zuGseCERgpnv167MAjNLnXMA",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "lead1",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [
+            "row_number"
+          ],
+          "schema": [
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "de09bd96-9d84-40b0-a531-5356a3123eda",
+      "name": "Update Reply Status in Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        -784,
+        592
+      ],
+      "credentials": {
+        "googleApi": {
+          "id": "FxyM9wDdowuRmuq0",
+          "name": "Google Sheets account 2"
+        }
+      },
+      "notes": "Updates the lead row to Status=Replied and logs reply timestamp + snippet."
+    },
+    {
+      "parameters": {
+        "sendTo": "YOUR_EMAIL@gmail.com",
+        "subject": "=🔔 New Reply from {{ $json.body.email }}",
+        "emailType": "text",
+        "message": "=You got a reply from: {{ $json.body.email }}\n\nReply Preview:\n{{ $json.body.replyText }}\n\nReplied at: {{ $json.body.repliedAt || 'Unknown' }}\n\nCheck your Google Sheet for full details.",
+        "options": {}
+      },
+      "id": "ee60961f-a177-4e1f-9887-11ed813ac551",
+      "name": "Notify Me of Reply (Gmail)",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -576,
+        592
+      ],
+      "webhookId": "82ddef4c-2d28-4818-bd2d-f04b7fb30548",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "OFz5cdXaB6JhKH7B",
+          "name": "Gmail account 3"
+        }
+      },
+      "notes": "Sends you a notification email whenever a lead replies. Change YOUR_EMAIL@gmail.com to your address."
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"status\": \"ok\", \"message\": \"Reply logged successfully\" }",
+        "options": {}
+      },
+      "id": "b57d4bef-76b6-4389-ab65-ba17e16ba4a5",
+      "name": "Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -352,
+        592
+      ],
+      "notes": "Returns 200 OK to the webhook caller (Google Pub/Sub, Zapier, etc.)"
+    },
+    {
+      "parameters": {},
+      "id": "6bdbb9f3-69ef-4884-80ad-34515e1c7443",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        672,
+        608
+      ],
+      "notes": "Catches any workflow errors automatically."
+    },
+    {
+      "parameters": {
+        "sendTo": "YOUR_EMAIL@gmail.com",
+        "subject": "=❌ Cold Outreach Workflow Error",
+        "emailType": "text",
+        "message": "=An error occurred in the AI Cold Outreach workflow.\n\nError: {{ $json.execution.error.message }}\n\nNode: {{ $json.execution.lastNodeExecuted }}\n\nExecution ID: {{ $json.execution.id }}\n\nCheck n8n for details.",
+        "options": {}
+      },
+      "id": "3bbf35f4-56bf-469b-bb5d-cc7b048ef69e",
+      "name": "Email Error Alert",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        896,
+        608
+      ],
+      "webhookId": "b6ad3051-55d7-44ff-b395-df37cc8b78d1",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "OFz5cdXaB6JhKH7B",
+          "name": "Gmail account 3"
+        }
+      },
+      "notes": "Sends you an email if anything breaks. Change YOUR_EMAIL@gmail.com to your address."
+    },
+    {
+      "parameters": {
+        "content": "## Lead Intake",
+        "height": 240,
+        "width": 432
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1040,
+        64
+      ],
+      "typeVersion": 1,
+      "id": "4693b587-0ecf-4ca3-bc66-866f507ff386",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "## Validate Lead Data",
+        "height": 240,
+        "width": 432,
+        "color": 2
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -512,
+        80
+      ],
+      "typeVersion": 1,
+      "id": "272eb919-b658-485a-8c81-2032ffbdb4eb",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "## AI Personalization\n",
+        "height": 400,
+        "width": 496,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -48,
+        32
+      ],
+      "typeVersion": 1,
+      "id": "6f882aa3-538e-48e1-bee0-5cc9d89fcb1d",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "content": "## Send & Log\n",
+        "height": 400,
+        "width": 864,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        512,
+        32
+      ],
+      "typeVersion": 1,
+      "id": "6394e82a-744c-43a1-a4d1-433a912cb572",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "content": "## Skipped Leads",
+        "height": 256,
+        "width": 352,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -64,
+        544
+      ],
+      "typeVersion": 1,
+      "id": "45b4beb9-0f0d-4bce-95a7-78bda0ea112e",
+      "name": "Sticky Note4"
+    },
+    {
+      "parameters": {
+        "content": "## Reply Tracking",
+        "height": 272,
+        "width": 928,
+        "color": "#A9F9E5"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1104,
+        528
+      ],
+      "typeVersion": 1,
+      "id": "2315c39d-dc14-4bcb-aa89-ed46c48994e8",
+      "name": "Sticky Note5"
+    },
+    {
+      "parameters": {
+        "content": "## Error Handling",
+        "height": 256,
+        "width": 720,
+        "color": "#D9D8D8"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        464,
+        544
+      ],
+      "typeVersion": 1,
+      "id": "eb8003b3-2b48-4816-8baa-b00086445a75",
+      "name": "Sticky Note6"
+    }
+  ],
+  "pinData": {
+    "Schedule Trigger (Daily)": [
+      {
+        "json": {
+          "Name": "Ayesha Khan",
+          "Company": "Northbridge Logistics",
+          "Role": "Operations Manager",
+          "Email": "ayesha.khan@northbridgelog.com",
+          "Industry": "Logistics & Supply Chain",
+          "LinkedIn": "linkedin.com/in/ayeshakhan-ops",
+          "Website": "northbridgelogistics.com",
+          "Status": "Pending",
+          "EmailSent": "",
+          "ReplyReceived": "",
+          "SentAt": "",
+          "Notes": "Company recently expanded to 3 new warehouses, likely struggling with manual dispatch tracking"
+        }
+      },
+      {
+        "json": {
+          "Name": "Daniyal Raza",
+          "Company": "Crestline Dental Group",
+          "Role": "Practice Owner",
+          "Email": "daniyal@crestlinedental.com",
+          "Industry": "Healthcare / Dental",
+          "LinkedIn": "linkedin.com/in/daniyalraza-dds",
+          "Website": "crestlinedental.com",
+          "Status": "Pending",
+          "EmailSent": "",
+          "ReplyReceived": "",
+          "SentAt": "",
+          "Notes": "Front desk currently handles appointment booking manually via phone calls"
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Schedule Trigger (Daily)": {
+      "main": [
+        [
+          {
+            "node": "Read Leads (Google Sheets)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Leads (Google Sheets)": {
+      "main": [
+        [
+          {
+            "node": "Process One Lead at a Time",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process One Lead at a Time": {
+      "main": [
+        [
+          {
+            "node": "Validate Lead Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Lead Data": {
+      "main": [
+        [
+          {
+            "node": "Generate Personalized Email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Skipped Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Email Personalizer (Gemini)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Generate Personalized Email",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Personalized Email": {
+      "main": [
+        [
+          {
+            "node": "Parse AI Email JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse AI Email JSON": {
+      "main": [
+        [
+          {
+            "node": "Send Email via Gmail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email via Gmail": {
+      "main": [
+        [
+          {
+            "node": "Mark as Sent in Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark as Sent in Sheet": {
+      "main": [
+        [
+          {
+            "node": "Wait 30s (Rate Limit)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 30s (Rate Limit)": {
+      "main": [
+        [
+          {
+            "node": "Next Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Next Lead": {
+      "main": [
+        [
+          {
+            "node": "Process One Lead at a Time",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reply Tracker Webhook": {
+      "main": [
+        [
+          {
+            "node": "Update Reply Status in Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Reply Status in Sheet": {
+      "main": [
+        [
+          {
+            "node": "Notify Me of Reply (Gmail)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Me of Reply (Gmail)": {
+      "main": [
+        [
+          {
+            "node": "Webhook Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Email Error Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "0ba554f3-7ddd-4f53-99ed-8e84603b5a27",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "1a40683457e603ad542c68c27986b0ff886ecf8cf9f5803c80b8830c6ee86d04"
+  },
+  "id": "lelQuakzjpLecMlq",
+  "tags": [
+    {
+      "updatedAt": "2026-06-26T20:05:35.650Z",
+      "createdAt": "2026-06-26T20:05:35.650Z",
+      "id": "7asKmzmo1EQ5vbCZ",
+      "name": "Cold Outreach"
+    },
+    {
+      "updatedAt": "2026-06-26T20:05:35.615Z",
+      "createdAt": "2026-06-26T20:05:35.615Z",
+      "id": "ROhNs22jV08di5bz",
+      "name": "AI Automation"
+    }
+  ]
+}
