@@ -1,0 +1,581 @@
+{
+  "name": "AI Invoice Processor",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinutes"
+            }
+          ]
+        },
+        "filters": {
+          "readStatus": "unread"
+        }
+      },
+      "id": "797bdba4-4018-4f01-b1df-539e567cb80c",
+      "name": "Gmail — Watch Inbox",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1760,
+        80
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "OFz5cdXaB6JhKH7B",
+          "name": "Gmail account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const email = $input.first().json;\n\n// Check if email has attachments\nconst attachments = email.attachments ?? [];\nconst pdfAttachment = attachments.find(a =>\n  a.mimeType === 'application/pdf' ||\n  (a.filename ?? '').toLowerCase().endsWith('.pdf')\n);\n\nif (!pdfAttachment) {\n  // No PDF — skip silently\n  return [{ json: { skip: true, reason: 'No PDF attachment found', emailId: email.id, subject: email.subject } }];\n}\n\nreturn [{\n  json: {\n    skip: false,\n    emailId:          email.id,\n    emailSubject:     email.subject ?? 'No subject',\n    emailFrom:        email.from ?? 'Unknown sender',\n    emailDate:        email.date ?? $now.toISO(),\n    attachmentName:   pdfAttachment.filename ?? 'invoice.pdf',\n    attachmentData:   pdfAttachment.content,\n    mimeType:         pdfAttachment.mimeType ?? 'application/pdf'\n  }\n}];"
+      },
+      "id": "5ba95121-e7db-413b-87ac-03bcf612165b",
+      "name": "Code — Extract PDF Attachment",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1536,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "id": "skip-check",
+              "leftValue": "={{ $json.skip }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e45ed377-7c97-473a-a212-7546741aacfc",
+      "name": "IF — Has PDF?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -1328,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "binaryPropertyName": "={{ $json.attachmentData }}",
+        "options": {}
+      },
+      "id": "43669a79-7070-4038-ae66-6be5f1abb567",
+      "name": "Extract from File — PDF to Text",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        -1040,
+        64
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Try to get text from Extract from File node first (production)\n// Fall back to reading directly from attachment content (mock/testing)\nlet pdfText = '';\n\ntry {\n  const fileData = $input.first().json;\n  pdfText = fileData.text ?? fileData.data ?? '';\n} catch(e) {\n  pdfText = '';\n}\n\n// If extraction returned nothing, read directly from attachment content\nif (!pdfText || pdfText.trim().length < 20) {\n  const attachmentData = $('Code — Extract PDF Attachment').first().json;\n  pdfText = attachmentData.attachmentData ?? '';\n}\n\nif (!pdfText || pdfText.trim().length < 20) {\n  return [{\n    json: {\n      ...$('Code — Extract PDF Attachment').first().json,\n      pdfText: '',\n      extractionError: 'No text could be extracted from PDF'\n    }\n  }];\n}\n\nconst attachmentData = $('Code — Extract PDF Attachment').first().json;\n\nreturn [{\n  json: {\n    ...attachmentData,\n    pdfText: pdfText.trim().substring(0, 8000)\n  }\n}];"
+      },
+      "id": "250d3477-d6cc-4ec1-8574-b2976ef899bb",
+      "name": "Code — Prepare PDF Text",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -864,
+        64
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama-3.3-70b-versatile\",\n  \"temperature\": 0.1,\n  \"max_tokens\": 600,\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are an expert invoice data extraction AI. Extract structured data from invoice text and return ONLY a raw JSON object — no markdown, no backticks, no explanation.\\n\\nAlways return exactly this format:\\n{\\n  \\\"invoice_number\\\": \\\"string or null\\\",\\n  \\\"invoice_date\\\": \\\"YYYY-MM-DD or null\\\",\\n  \\\"due_date\\\": \\\"YYYY-MM-DD or null\\\",\\n  \\\"vendor_name\\\": \\\"string or null\\\",\\n  \\\"vendor_email\\\": \\\"string or null\\\",\\n  \\\"vendor_address\\\": \\\"string or null\\\",\\n  \\\"bill_to\\\": \\\"company/person being billed or null\\\",\\n  \\\"subtotal\\\": number or null,\\n  \\\"tax_amount\\\": number or null,\\n  \\\"tax_rate\\\": \\\"string percentage or null\\\",\\n  \\\"total_amount\\\": number or null,\\n  \\\"currency\\\": \\\"USD/EUR/GBP/PKR etc or null\\\",\\n  \\\"payment_terms\\\": \\\"string or null\\\",\\n  \\\"line_items\\\": [{\\\"description\\\": \\\"string\\\", \\\"quantity\\\": number, \\\"unit_price\\\": number, \\\"total\\\": number}],\\n  \\\"notes\\\": \\\"any important notes or null\\\",\\n  \\\"confidence\\\": \\\"High/Medium/Low based on how clear the text was\\\"\\n}\\n\\nFor amounts, return numbers only (no currency symbols). If a field is not found, use null. For dates, convert to YYYY-MM-DD format.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Extract all invoice data from this PDF text:\\n\\n{{ $json.pdfText }}\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "631e2f86-4390-4e77-9cac-374318e711db",
+      "name": "Groq — Extract Invoice Data",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -640,
+        64
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "TZziUn7tAvEHQheq",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const groqResponse = $input.first().json;\nconst emailData = $('Code — Prepare PDF Text').first().json;\n\nconst rawText = groqResponse?.choices?.[0]?.message?.content ?? '{}';\nconst cleaned = rawText.replace(/```json\\s*/gi,'').replace(/```\\s*/gi,'').trim();\n\nlet invoice;\ntry {\n  invoice = JSON.parse(cleaned);\n} catch(e) {\n  invoice = {\n    invoice_number: null, invoice_date: null, due_date: null,\n    vendor_name: null, vendor_email: null, vendor_address: null,\n    bill_to: null, subtotal: null, tax_amount: null, tax_rate: null,\n    total_amount: null, currency: null, payment_terms: null,\n    line_items: [], notes: 'JSON parse error: ' + e.message,\n    confidence: 'Low'\n  };\n}\n\n// Validation — check required fields\nconst requiredFields = ['vendor_name', 'total_amount', 'invoice_date'];\nconst missingFields = requiredFields.filter(f => !invoice[f]);\nconst isValid = missingFields.length === 0;\n\n// Format line items as readable string for sheets\nconst lineItemsStr = (invoice.line_items ?? []).map(item =>\n  `${item.description} x${item.quantity} @ ${item.unit_price} = ${item.total}`\n).join(' | ');\n\nreturn [{\n  json: {\n    // Email metadata\n    email_id:          emailData.emailId,\n    email_subject:     emailData.emailSubject,\n    email_from:        emailData.emailFrom,\n    email_date:        emailData.emailDate,\n    attachment_name:   emailData.attachmentName,\n    processed_at:      $now.toISO(),\n\n    // Extracted invoice data\n    invoice_number:    invoice.invoice_number,\n    invoice_date:      invoice.invoice_date,\n    due_date:          invoice.due_date,\n    vendor_name:       invoice.vendor_name,\n    vendor_email:      invoice.vendor_email,\n    vendor_address:    invoice.vendor_address,\n    bill_to:           invoice.bill_to,\n    subtotal:          invoice.subtotal,\n    tax_amount:        invoice.tax_amount,\n    tax_rate:          invoice.tax_rate,\n    total_amount:      invoice.total_amount,\n    currency:          invoice.currency ?? 'USD',\n    payment_terms:     invoice.payment_terms,\n    line_items:        lineItemsStr,\n    notes:             invoice.notes,\n    confidence:        invoice.confidence,\n\n    // Validation\n    is_valid:          isValid,\n    missing_fields:    missingFields.join(', ') || 'None',\n    status:            isValid ? 'Processed' : 'Review Required'\n  }\n}];"
+      },
+      "id": "09ce361a-d17d-4495-bf8f-4d6d9345c3f1",
+      "name": "Code — Parse + Validate Invoice",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -432,
+        64
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "id": "valid-check",
+              "leftValue": "={{ $json.is_valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "beda77a1-5b48-4f77-b76d-5035bfa0979b",
+      "name": "IF — Extraction Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -112,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID_HERE",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Invoices",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Processed At": "={{ $json.processed_at }}",
+            "Status": "={{ $json.status }}",
+            "Invoice Number": "={{ $json.invoice_number }}",
+            "Invoice Date": "={{ $json.invoice_date }}",
+            "Due Date": "={{ $json.due_date }}",
+            "Vendor Name": "={{ $json.vendor_name }}",
+            "Vendor Email": "={{ $json.vendor_email }}",
+            "Bill To": "={{ $json.bill_to }}",
+            "Subtotal": "={{ $json.subtotal }}",
+            "Tax Amount": "={{ $json.tax_amount }}",
+            "Tax Rate": "={{ $json.tax_rate }}",
+            "Total Amount": "={{ $json.total_amount }}",
+            "Currency": "={{ $json.currency }}",
+            "Payment Terms": "={{ $json.payment_terms }}",
+            "Line Items": "={{ $json.line_items }}",
+            "Confidence": "={{ $json.confidence }}",
+            "Email Subject": "={{ $json.email_subject }}",
+            "Email From": "={{ $json.email_from }}",
+            "Attachment": "={{ $json.attachment_name }}",
+            "Notes": "={{ $json.notes }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "fab3e59d-4869-40a2-bdd6-77cc09f0b3fb",
+      "name": "Google Sheets — Log Invoice",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        288,
+        -64
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "CfxaDN5zeXKxOD4u",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID_HERE",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Errors",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Timestamp": "={{ $json.processed_at }}",
+            "Status": "=Review Required",
+            "Email Subject": "={{ $json.email_subject }}",
+            "Email From": "={{ $json.email_from }}",
+            "Attachment": "={{ $json.attachment_name }}",
+            "Missing Fields": "={{ $json.missing_fields }}",
+            "Confidence": "={{ $json.confidence }}",
+            "Vendor Found": "={{ $json.vendor_name ?? 'Not found' }}",
+            "Amount Found": "={{ $json.total_amount ?? 'Not found' }}",
+            "Notes": "={{ $json.notes }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "a55c0bfa-88ed-4157-846e-d30836387976",
+      "name": "Google Sheets — Log Error",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        320,
+        256
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "CfxaDN5zeXKxOD4u",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "YOUR_ALERT_EMAIL_HERE",
+        "subject": "=⚠️ Invoice extraction failed — {{ $json.attachment_name }}",
+        "emailType": "text",
+        "message": "=Invoice extraction needs manual review.\n\nEmail: {{ $json.email_subject }}\nFrom: {{ $json.email_from }}\nFile: {{ $json.attachment_name }}\nProcessed: {{ $json.processed_at }}\n\nMissing fields: {{ $json.missing_fields }}\nConfidence: {{ $json.confidence }}\n\nWhat was extracted:\nVendor: {{ $json.vendor_name ?? 'Not found' }}\nAmount: {{ $json.total_amount ?? 'Not found' }}\nDate: {{ $json.invoice_date ?? 'Not found' }}\n\nPlease open the original email and enter the data manually in the Errors sheet.",
+        "options": {}
+      },
+      "id": "add96736-42c7-4a81-b2ca-90c830b9e72f",
+      "name": "Gmail — Send Error Alert",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [
+        608,
+        288
+      ],
+      "webhookId": "d52fc75b-a03f-4ce8-96f7-71a468b8b778",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "OFz5cdXaB6JhKH7B",
+          "name": "Gmail account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email_from }}",
+        "subject": "=Re: {{ $json.email_subject }} — Invoice Received ✅",
+        "emailType": "text",
+        "message": "=Hi,\n\nThank you for sending your invoice. We have received and processed it successfully.\n\nInvoice Summary:\n- Invoice Number: {{ $json.invoice_number ?? 'N/A' }}\n- Invoice Date: {{ $json.invoice_date ?? 'N/A' }}\n- Total Amount: {{ $json.currency }} {{ $json.total_amount }}\n- Due Date: {{ $json.due_date ?? 'N/A' }}\n\nWe will process payment as per our usual terms.\n\nBest regards,\nThe Accounts Team",
+        "options": {}
+      },
+      "id": "5ef28c20-0d3f-456e-b1d8-f9a679725544",
+      "name": "Gmail — Send Confirmation",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [
+        576,
+        -64
+      ],
+      "webhookId": "219c7451-ee34-4773-ad43-31882e8467c5",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "OFz5cdXaB6JhKH7B",
+          "name": "Gmail account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Inbox Intake\n",
+        "height": 352,
+        "width": 688,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1856,
+        -32
+      ],
+      "typeVersion": 1,
+      "id": "8dd57fc8-1373-4133-bc48-cd5f9f7a9079",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "## PDF → Text Extraction\n",
+        "height": 352,
+        "width": 416,
+        "color": 2
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1120,
+        -32
+      ],
+      "typeVersion": 1,
+      "id": "2df5f72b-e04b-46eb-aa8d-db03834509e3",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "## AI Extraction\n",
+        "height": 352,
+        "width": 416,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -688,
+        -32
+      ],
+      "typeVersion": 1,
+      "id": "21845405-09ef-4b12-adb3-6ef9d94113b6",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "content": "## Validation Gate",
+        "height": 256,
+        "width": 272,
+        "color": "#D3CFCF"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -192,
+        -16
+      ],
+      "typeVersion": 1,
+      "id": "5ae2e07f-c581-48d1-9c9c-e16b5abab597",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "content": "## Processed Invoices",
+        "height": 320,
+        "width": 704,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        176,
+        -192
+      ],
+      "typeVersion": 1,
+      "id": "3145d7ef-b772-4f0b-bced-4d8c40845f09",
+      "name": "Sticky Note4"
+    },
+    {
+      "parameters": {
+        "content": "## Review Required",
+        "height": 320,
+        "width": 704,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        176,
+        176
+      ],
+      "typeVersion": 1,
+      "id": "ba19a252-eda3-4352-8fd6-9285739b398f",
+      "name": "Sticky Note5"
+    }
+  ],
+  "pinData": {
+    "Gmail — Watch Inbox": [
+      {
+        "json": {
+          "id": "18f4a2b3c4d5e6f7",
+          "threadId": "18f4a2b3c4d5e6f7",
+          "snippet": "Please find attached our invoice for services rendered in June 2026.",
+          "subject": "Invoice #INV-2026-0042 from Tech Solutions Ltd",
+          "from": "billing@techsolutions.com",
+          "date": "2026-06-24T10:30:00.000Z",
+          "to": "accounts@yourcompany.com",
+          "labelIds": [
+            "INBOX",
+            "UNREAD"
+          ],
+          "attachments": [
+            {
+              "filename": "INV-2026-0042.pdf",
+              "mimeType": "application/pdf",
+              "size": 45231,
+              "content": "INVOICE\n\nTech Solutions Ltd\n123 Business Park, Karachi, Pakistan\nbilling@techsolutions.com\n\nInvoice Number: INV-2026-0042\nInvoice Date: June 20, 2026\nDue Date: July 20, 2026\n\nBill To:\nYour Company Name\n456 Office Street, Lahore, Pakistan\n\nPayment Terms: Net 30\n\nLine Items:\n1. Web Development Services    10 hours @ PKR 5,000    PKR 50,000\n2. UI/UX Design                5 hours  @ PKR 4,000    PKR 20,000\n3. Server Setup & Configuration 1 unit  @ PKR 15,000   PKR 15,000\n\nSubtotal:    PKR 85,000\nTax (17%):   PKR 14,450\nTotal:       PKR 99,450\n\nBank Details:\nBank: Meezan Bank\nAccount: 0123-4567890-01\nIBAN: PK12MEZN0001234567890101\n\nNotes: Payment via bank transfer only. Please include invoice number in reference."
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Gmail — Watch Inbox": {
+      "main": [
+        [
+          {
+            "node": "Code — Extract PDF Attachment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code — Extract PDF Attachment": {
+      "main": [
+        [
+          {
+            "node": "IF — Has PDF?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — Has PDF?": {
+      "main": [
+        [
+          {
+            "node": "Extract from File — PDF to Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File — PDF to Text": {
+      "main": [
+        [
+          {
+            "node": "Code — Prepare PDF Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code — Prepare PDF Text": {
+      "main": [
+        [
+          {
+            "node": "Groq — Extract Invoice Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq — Extract Invoice Data": {
+      "main": [
+        [
+          {
+            "node": "Code — Parse + Validate Invoice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code — Parse + Validate Invoice": {
+      "main": [
+        [
+          {
+            "node": "IF — Extraction Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — Extraction Valid?": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets — Log Invoice",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Google Sheets — Log Error",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Gmail — Send Error Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets — Log Invoice": {
+      "main": [
+        [
+          {
+            "node": "Gmail — Send Confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets — Log Error": {
+      "main": [
+        [
+          {
+            "node": "Gmail — Send Error Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "fdc64eb3-49e1-458b-b9cd-26d87b9c0ac7",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "1a40683457e603ad542c68c27986b0ff886ecf8cf9f5803c80b8830c6ee86d04"
+  },
+  "id": "h3nJzdryrBtGx9pC",
+  "tags": []
+}
