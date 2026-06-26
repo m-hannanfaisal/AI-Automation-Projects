@@ -1,0 +1,768 @@
+{
+  "name": "Hiring-Signal-Lead-Engine",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 7 * * *"
+            }
+          ]
+        }
+      },
+      "id": "5e495d0e-b4eb-4ac0-a33e-6d48aeba2963",
+      "name": "Daily Scrape Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -1760,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.apify.com/v2/acts/YOUR_ACTOR_ID/runs?token=YOUR_APIFY_TOKEN",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"queries\": \"DevOps Engineer OR Site Reliability Engineer\",\n  \"location\": \"Singapore\",\n  \"maxItems\": 50\n}",
+        "options": {}
+      },
+      "id": "6dc9fe9c-38d7-409b-af99-7d3a31be0ffd",
+      "name": "Start LinkedIn Scrape (Apify)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1536,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 60
+      },
+      "id": "b4c78fdf-e218-4c2a-85ae-e052525c1708",
+      "name": "Wait for Scrape",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -1328,
+        128
+      ],
+      "webhookId": "c4a99f59-77c6-4867-953b-26aa4f1c48bd"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.apify.com/v2/datasets/{{$json.defaultDatasetId}}/items?token=YOUR_APIFY_TOKEN",
+        "options": {}
+      },
+      "id": "25e371fc-5cfb-4650-9411-0683b28a1194",
+      "name": "Get Scraped Jobs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1104,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "b68525c4-1da6-418d-8750-cb351d935939",
+      "name": "Standardize Fields",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -880,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": ""
+          },
+          "conditions": [
+            {
+              "leftValue": "={{$json.company}}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "112cae47-77e1-45cd-b0e3-95810ead1cea",
+      "name": "Has Company Name",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [
+        -656,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": ""
+          },
+          "conditions": [
+            {
+              "leftValue": "={{$json.company}}",
+              "rightValue": "recruit|staffing|talent agency|headhunt",
+              "operator": {
+                "type": "string",
+                "operation": "notRegexMatch"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "e5afd017-332c-4339-bf98-1f035d3601f1",
+      "name": "Exclude Recruiters",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [
+        -368,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "leftValue": ""
+          },
+          "conditions": [
+            {
+              "leftValue": "={{$input.all().length}}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "394ec48c-fe3d-46b2-bae6-119a8957521b",
+      "name": "Zero Results After Filtering?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -176,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "you@yourdomain.com",
+        "subject": "⚠️ Lead Engine: scrape returned 0 usable rows today",
+        "emailType": "text",
+        "message": "The DevOps/SRE scrape ran but returned zero results after filtering. Check if the Apify actor or source site has changed.",
+        "options": {}
+      },
+      "id": "3413e6f6-0a72-4be1-ab3a-bae358570ef0",
+      "name": "Alert - No Results",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        48,
+        0
+      ],
+      "webhookId": "d20e76ab-9aef-4eb0-8d20-add428afffe5",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "OFz5cdXaB6JhKH7B",
+          "name": "Gmail account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1PPQ1odX2VgvW0WNBMZ0zuGseCERgpnv167MAjNLnXMA"
+        },
+        "sheetName": {
+          "value": "All Leads"
+        },
+        "options": {}
+      },
+      "id": "33a8f102-802b-4767-925f-38c812c1ad94",
+      "name": "Read Existing Leads",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        416,
+        176
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "CfxaDN5zeXKxOD4u",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const existing = $('Read Existing Leads').all().map(i => `${(i.json.company||'').toLowerCase().trim()}|${(i.json.title||'').toLowerCase().trim()}`);\nconst existingSet = new Set(existing);\nconst newItems = [];\nfor (const item of $input.all()) {\n  const key = `${(item.json.company||'').toLowerCase().trim()}|${(item.json.title||'').toLowerCase().trim()}`;\n  if (!existingSet.has(key)) {\n    newItems.push(item);\n  }\n}\nreturn newItems;"
+      },
+      "id": "df76147f-265e-476e-9d8c-36c176f2173b",
+      "name": "Dedupe Against Existing",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        640,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1PPQ1odX2VgvW0WNBMZ0zuGseCERgpnv167MAjNLnXMA"
+        },
+        "sheetName": {
+          "value": "All Leads"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "979d2983-91a6-44c9-aead-ffb02e2ed5f3",
+      "name": "Append New Leads (Raw)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        864,
+        176
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "CfxaDN5zeXKxOD4u",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"gpt-4o-mini\",\n  \"response_format\": { \"type\": \"json_object\" },\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You score job postings 0-5 for how strongly they signal a company needs observability/monitoring tooling. Score criteria: +1 if posting mentions on-call rotation or incident response burden. +1 if no specific observability tool (Datadog, New Relic, Grafana, Prometheus, etc) is named, suggesting greenfield need. +1 if company size signals mid-size or larger (not an early-stage 2-person startup). +1 if role is Lead/Manager/Head level (budget authority). +1 if posting explicitly mentions scaling infrastructure or reliability goals. Return strict JSON: {\\\"score\\\": <0-5 integer>, \\\"reasoning\\\": \\\"<one sentence>\\\"}\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Company: {{$json.company}}\\nTitle: {{$json.title}}\\nDescription: {{$json.description}}\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "c6a41d0b-b9de-44e1-88aa-d6c8c748bb43",
+      "name": "AI Score Lead",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1088,
+        176
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "QNOIcLMW7cMGjMl5",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nreturn items.map(item => {\n  let parsed = { score: 0, reasoning: 'parse error' };\n  try {\n    const content = item.json.choices[0].message.content;\n    parsed = JSON.parse(content);\n  } catch (e) {}\n  return {\n    json: {\n      ...item.json.__originalData,\n      score: parsed.score,\n      reasoning: parsed.reasoning\n    }\n  };\n});"
+      },
+      "id": "69a84b03-bf20-49e2-940b-6da1c18c6d88",
+      "name": "Parse AI Score",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1296,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "leftValue": ""
+          },
+          "conditions": [
+            {
+              "leftValue": "={{$json.score}}",
+              "rightValue": 3,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "47f69aa2-5a55-4f5e-bec9-bdb43d74dcbd",
+      "name": "Score >= 3",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [
+        1520,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "2c002fcf-3d97-4979-8b7f-ec2e03c18fdb",
+      "name": "Format Qualified Lead",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1744,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1PPQ1odX2VgvW0WNBMZ0zuGseCERgpnv167MAjNLnXMA"
+        },
+        "sheetName": {
+          "value": "Qualified Leads"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "8377b0e7-561d-44e3-be62-da68da25b0b0",
+      "name": "Append Qualified Leads",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1968,
+        176
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "CfxaDN5zeXKxOD4u",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * *"
+            }
+          ]
+        }
+      },
+      "id": "8bb6857f-0168-476f-b51e-5a1bde8315dc",
+      "name": "Daily Digest Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -96,
+        752
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1PPQ1odX2VgvW0WNBMZ0zuGseCERgpnv167MAjNLnXMA"
+        },
+        "sheetName": {
+          "value": "Qualified Leads"
+        },
+        "options": {}
+      },
+      "id": "ab18963d-88d7-4765-a9f8-580a680d5431",
+      "name": "Read Today's Qualified Leads",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        128,
+        752
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "CfxaDN5zeXKxOD4u",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const today = new Date().toISOString().slice(0,10);\nconst todays = $input.all().filter(i => i.json.qualifiedDate === today);\nif (todays.length === 0) {\n  return [{ json: { html: '<p>No qualified leads today.</p>', count: 0 } }];\n}\nlet rows = todays.map(i => `<tr><td>${i.json.company}</td><td>${i.json.title}</td><td>${i.json.score}</td><td>${i.json.reasoning}</td><td><a href=\"${i.json.jobUrl}\">link</a></td></tr>`).join('');\nconst html = `<table border=\"1\" cellpadding=\"6\"><tr><th>Company</th><th>Title</th><th>Score</th><th>Reasoning</th><th>Link</th></tr>${rows}</table>`;\nreturn [{ json: { html, count: todays.length } }];"
+      },
+      "id": "8e91e6f5-7e99-4cb1-9f5e-1084dfe7cc79",
+      "name": "Build Digest HTML",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        336,
+        752
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "you@yourdomain.com",
+        "subject": "=Daily Lead Digest - {{$json.count}} qualified leads",
+        "message": "={{$json.html}}",
+        "options": {}
+      },
+      "id": "808e16b7-4e2e-4dfc-9cd8-79f1c3dc2238",
+      "name": "Send Daily Digest",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        560,
+        752
+      ],
+      "webhookId": "8a9d77cf-6396-4835-b5f7-0028640ad1a1",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "OFz5cdXaB6JhKH7B",
+          "name": "Gmail account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Scrape/Ingest area\n## Data Ingestion — pulls raw records from source, standardizes fields\"",
+        "height": 544,
+        "width": 1408,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1920,
+        -96
+      ],
+      "typeVersion": 1,
+      "id": "a1cd665b-4ef7-46c8-8cf5-41fec7ed5fa8",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "## Filtering\n## removes incomplete or irrelevant records before they enter the pipeline",
+        "height": 560,
+        "width": 656
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -416,
+        -96
+      ],
+      "typeVersion": 1,
+      "id": "5b28a30b-35e5-4b42-b7df-45c1bab6de60",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "## Dedupe & Score\n## checks against existing records, then scores each item using AI against defined criteria",
+        "height": 544,
+        "width": 1040,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        368,
+        -80
+      ],
+      "typeVersion": 1,
+      "id": "701e3bd8-abae-4fd2-8df1-9cd8123ed081",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "content": "## Qualify\n## Qualification — items meeting the score threshold get saved to a separate output sheet",
+        "height": 560,
+        "width": 688,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1472,
+        -80
+      ],
+      "typeVersion": 1,
+      "id": "9d9a67d6-d0d9-432f-8e76-34091ffae57a",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "content": "## Daily Digest",
+        "height": 416,
+        "width": 992,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -144,
+        576
+      ],
+      "typeVersion": 1,
+      "id": "9ade32e0-90ce-4c29-89ab-306d17078d13",
+      "name": "Sticky Note4"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Daily Scrape Trigger": {
+      "main": [
+        [
+          {
+            "node": "Start LinkedIn Scrape (Apify)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start LinkedIn Scrape (Apify)": {
+      "main": [
+        [
+          {
+            "node": "Wait for Scrape",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for Scrape": {
+      "main": [
+        [
+          {
+            "node": "Get Scraped Jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Scraped Jobs": {
+      "main": [
+        [
+          {
+            "node": "Standardize Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Standardize Fields": {
+      "main": [
+        [
+          {
+            "node": "Has Company Name",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Company Name": {
+      "main": [
+        [
+          {
+            "node": "Exclude Recruiters",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Exclude Recruiters": {
+      "main": [
+        [
+          {
+            "node": "Zero Results After Filtering?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Zero Results After Filtering?": {
+      "main": [
+        [
+          {
+            "node": "Alert - No Results",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Read Existing Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Existing Leads": {
+      "main": [
+        [
+          {
+            "node": "Dedupe Against Existing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dedupe Against Existing": {
+      "main": [
+        [
+          {
+            "node": "Append New Leads (Raw)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append New Leads (Raw)": {
+      "main": [
+        [
+          {
+            "node": "AI Score Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Score Lead": {
+      "main": [
+        [
+          {
+            "node": "Parse AI Score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse AI Score": {
+      "main": [
+        [
+          {
+            "node": "Score >= 3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Score >= 3": {
+      "main": [
+        [
+          {
+            "node": "Format Qualified Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Qualified Lead": {
+      "main": [
+        [
+          {
+            "node": "Append Qualified Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daily Digest Trigger": {
+      "main": [
+        [
+          {
+            "node": "Read Today's Qualified Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Today's Qualified Leads": {
+      "main": [
+        [
+          {
+            "node": "Build Digest HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Digest HTML": {
+      "main": [
+        [
+          {
+            "node": "Send Daily Digest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "cd393201-a858-435d-aac6-7c7b46f145de",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "1a40683457e603ad542c68c27986b0ff886ecf8cf9f5803c80b8830c6ee86d04"
+  },
+  "id": "zRSSlQ5N1zvIPkqF",
+  "tags": []
+}
