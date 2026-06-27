@@ -1,0 +1,231 @@
+{
+  "name": "Daily AI Social Media Pipeline — Personal Finance",
+  "nodes": [
+
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "0 9 * * 1-6" }]
+        }
+      },
+      "id": "node-schedule",
+      "name": "Schedule — Daily 9AM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [240, 100]
+    },
+
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama-3.3-70b-versatile\",\n  \"temperature\": 0.9,\n  \"max_tokens\": 200,\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are a content strategist for a Personal Finance and Investing brand. Your job is to pick a fresh, specific, engaging topic to post about today. Return ONLY a raw JSON object — no markdown, no backticks.\\n\\nFormat:\\n{\\n  \\\"topic\\\": \\\"The specific topic for today\\\",\\n  \\\"angle\\\": \\\"The unique angle or hook\\\",\\n  \\\"content_type\\\": \\\"tip or myth or statistic or story or how-to or list\\\",\\n  \\\"target_emotion\\\": \\\"curiosity or fear or inspiration or surprise or motivation\\\"\\n}\\n\\nExamples of good topics:\\n- Why keeping cash in a savings account is actually losing you money\\n- The 50/30/20 budget rule — does it actually work?\\n- How compound interest makes your first PKR 100,000 the hardest to save\\n- 3 investing mistakes people make in their 20s\\n- Why index funds beat 90% of professional investors\\n- The difference between assets and liabilities most schools never teach\\n\\nPick something fresh and specific. Today's date: {{ $now.toFormat('EEEE, MMMM d yyyy') }}\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Pick today's personal finance topic.\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "node-groq-topic",
+      "name": "Groq — Pick Today's Topic",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [460, 100],
+      "credentials": {
+        "httpHeaderAuth": { "name": "Groq API Key" }
+      }
+    },
+
+    {
+      "parameters": {
+        "jsCode": "const groqResponse = $input.first().json;\nconst rawText = groqResponse?.choices?.[0]?.message?.content ?? '{}';\nconst cleaned = rawText.replace(/```json\\s*/gi,'').replace(/```\\s*/gi,'').trim();\n\nlet topic;\ntry { topic = JSON.parse(cleaned); }\ncatch(e) {\n  topic = {\n    topic: 'The power of compound interest',\n    angle: 'Why starting early beats saving more later',\n    content_type: 'tip',\n    target_emotion: 'motivation'\n  };\n}\n\nreturn [{ json: { ...topic, picked_at: $now.toISO(), date: $now.toFormat('yyyy-MM-dd') } }];"
+      },
+      "id": "node-parse-topic",
+      "name": "Code — Parse Topic",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 100]
+    },
+
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama-3.3-70b-versatile\",\n  \"temperature\": 0.8,\n  \"max_tokens\": 1200,\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are an expert Personal Finance and Investing content creator. You write engaging, educational content that gets high engagement. Return ONLY a raw JSON object — no markdown, no backticks, no explanation.\\n\\nFormat:\\n{\\n  \\\"linkedin_post\\\": \\\"The full LinkedIn post text (150-250 words, no hashtags yet, use line breaks for readability, start with a hook, end with a question to drive comments)\\\",\\n  \\\"blog_title\\\": \\\"SEO-optimized blog post title\\\",\\n  \\\"blog_content\\\": \\\"Full blog article (400-600 words, with subheadings, practical examples, a conclusion with a call to action)\\\",\\n  \\\"hashtags\\\": \\\"10 relevant hashtags as a single string separated by spaces\\\",\\n  \\\"linkedin_hook\\\": \\\"First line of the LinkedIn post — must make people stop scrolling\\\",\\n  \\\"seo_description\\\": \\\"150-character SEO meta description for the blog post\\\"\\n}\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Write content for today's topic:\\n\\nTopic: {{ $json.topic }}\\nAngle: {{ $json.angle }}\\nContent type: {{ $json.content_type }}\\nTarget emotion: {{ $json.target_emotion }}\\nDate: {{ $now.toFormat('MMMM d, yyyy') }}\\n\\nAudience: Pakistani and South Asian professionals aged 22-40 who want to grow their wealth. Use relatable examples with PKR amounts where relevant.\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "node-groq-content",
+      "name": "Groq — Write All Content",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [900, 100],
+      "credentials": {
+        "httpHeaderAuth": { "name": "Groq API Key" }
+      }
+    },
+
+    {
+      "parameters": {
+        "jsCode": "const groqResponse = $input.first().json;\nconst topicData = $('Code — Parse Topic').first().json;\n\nconst rawText = groqResponse?.choices?.[0]?.message?.content ?? '{}';\nconst cleaned = rawText.replace(/```json\\s*/gi,'').replace(/```\\s*/gi,'').trim();\n\nlet content;\ntry { content = JSON.parse(cleaned); }\ncatch(e) {\n  content = {\n    linkedin_post: 'Content generation failed. Please retry.',\n    blog_title: topicData.topic,\n    blog_content: 'Content generation failed. Please retry.',\n    hashtags: '#PersonalFinance #Investing #Money #Finance #WealthBuilding',\n    linkedin_hook: topicData.topic,\n    seo_description: topicData.topic\n  };\n}\n\n// Clean up text for safe use in API calls\nconst cleanText = (str) => (str ?? '').replace(/\\n/g, '\\n').trim();\n\nreturn [{\n  json: {\n    // Topic data\n    topic:             topicData.topic,\n    angle:             topicData.angle,\n    content_type:      topicData.content_type,\n    target_emotion:    topicData.target_emotion,\n    date:              topicData.date,\n\n    // Generated content\n    linkedin_post:     cleanText(content.linkedin_post),\n    linkedin_hook:     cleanText(content.linkedin_hook),\n    blog_title:        cleanText(content.blog_title),\n    blog_content:      cleanText(content.blog_content),\n    hashtags:          cleanText(content.hashtags),\n    seo_description:   cleanText(content.seo_description),\n\n    // Full LinkedIn post with hashtags\n    linkedin_full:     cleanText(content.linkedin_post) + '\\n\\n' + cleanText(content.hashtags)\n  }\n}];"
+      },
+      "id": "node-parse-content",
+      "name": "Code — Parse All Content",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 100]
+    },
+
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.linkedin.com/v2/ugcPosts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization",  "value": "=Bearer YOUR_LINKEDIN_ACCESS_TOKEN_HERE" },
+            { "name": "Content-Type",   "value": "application/json" },
+            { "name": "X-Restli-Protocol-Version", "value": "2.0.0" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"author\": \"urn:li:person:YOUR_LINKEDIN_PERSON_ID_HERE\",\n  \"lifecycleState\": \"PUBLISHED\",\n  \"specificContent\": {\n    \"com.linkedin.ugc.ShareContent\": {\n      \"shareCommentary\": {\n        \"text\": \"{{ $json.linkedin_full }}\"\n      },\n      \"shareMediaCategory\": \"NONE\"\n    }\n  },\n  \"visibility\": {\n    \"com.linkedin.ugc.MemberNetworkVisibility\": \"PUBLIC\"\n  }\n}",
+        "options": {}
+      },
+      "id": "node-linkedin",
+      "name": "LinkedIn — Publish Post",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1340, 20]
+    },
+
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=YOUR_WORDPRESS_SITE_URL_HERE/wp-json/wp/v2/posts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Basic YOUR_WORDPRESS_BASE64_CREDENTIALS_HERE" },
+            { "name": "Content-Type",  "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"title\": \"{{ $json.blog_title }}\",\n  \"content\": \"{{ $json.blog_content }}\",\n  \"status\": \"publish\",\n  \"excerpt\": \"{{ $json.seo_description }}\",\n  \"categories\": [1],\n  \"tags\": []\n}",
+        "options": {}
+      },
+      "id": "node-wordpress",
+      "name": "WordPress — Publish Blog Post",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1340, 160]
+    },
+
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": { "__rl": true, "value": "YOUR_GOOGLE_SHEET_ID_HERE", "mode": "id" },
+        "sheetName":  { "__rl": true, "value": "Posts", "mode": "name" },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Date":           "={{ $json.date }}",
+            "Topic":          "={{ $json.topic }}",
+            "Angle":          "={{ $json.angle }}",
+            "Content Type":   "={{ $json.content_type }}",
+            "LinkedIn Hook":  "={{ $json.linkedin_hook }}",
+            "LinkedIn Post":  "={{ $json.linkedin_post }}",
+            "Hashtags":       "={{ $json.hashtags }}",
+            "Blog Title":     "={{ $json.blog_title }}",
+            "SEO Description":"={{ $json.seo_description }}",
+            "Status":         "=Published",
+            "Platform":       "=LinkedIn + WordPress"
+          }
+        },
+        "options": {}
+      },
+      "id": "node-sheets",
+      "name": "Google Sheets — Log Post",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [1340, 300],
+      "credentials": {
+        "googleSheetsOAuth2Api": { "name": "Google Sheets Account" }
+      }
+    },
+
+    {
+      "parameters": {
+        "sendTo":    "YOUR_EMAIL_HERE",
+        "subject":   "=Daily post published — {{ $json.date }}",
+        "emailType": "html",
+        "message":   "=<html><body style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;'>\n<h2 style='color: #1a5276;'>Your daily content has been published!</h2>\n<p><strong>Date:</strong> {{ $json.date }}</p>\n<hr/>\n<h3>Today's Topic</h3>\n<p><strong>{{ $json.topic }}</strong></p>\n<p><em>{{ $json.angle }}</em></p>\n<hr/>\n<h3>LinkedIn Post</h3>\n<p style='background: #f8f9fa; padding: 15px; border-left: 4px solid #0077b5; border-radius: 4px;'>{{ $json.linkedin_post }}</p>\n<p><strong>Hashtags:</strong> {{ $json.hashtags }}</p>\n<hr/>\n<h3>Blog Post</h3>\n<p><strong>Title:</strong> {{ $json.blog_title }}</p>\n<p><strong>SEO Description:</strong> {{ $json.seo_description }}</p>\n<hr/>\n<p style='color: #888; font-size: 12px;'>This post was generated and published automatically by your n8n content pipeline.</p>\n</body></html>",
+        "options":   {}
+      },
+      "id": "node-gmail-summary",
+      "name": "Gmail — Daily Summary",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [1560, 160],
+      "credentials": {
+        "gmailOAuth2": { "name": "Gmail Account" }
+      }
+    }
+
+  ],
+
+  "connections": {
+    "Schedule — Daily 9AM": {
+      "main": [[{ "node": "Groq — Pick Today's Topic", "type": "main", "index": 0 }]]
+    },
+    "Groq — Pick Today's Topic": {
+      "main": [[{ "node": "Code — Parse Topic", "type": "main", "index": 0 }]]
+    },
+    "Code — Parse Topic": {
+      "main": [[{ "node": "Groq — Write All Content", "type": "main", "index": 0 }]]
+    },
+    "Groq — Write All Content": {
+      "main": [[{ "node": "Code — Parse All Content", "type": "main", "index": 0 }]]
+    },
+    "Code — Parse All Content": {
+      "main": [[
+        { "node": "LinkedIn — Publish Post",       "type": "main", "index": 0 },
+        { "node": "WordPress — Publish Blog Post", "type": "main", "index": 0 },
+        { "node": "Google Sheets — Log Post",      "type": "main", "index": 0 }
+      ]]
+    },
+    "LinkedIn — Publish Post": {
+      "main": [[{ "node": "Gmail — Daily Summary", "type": "main", "index": 0 }]]
+    },
+    "WordPress — Publish Blog Post": {
+      "main": [[{ "node": "Gmail — Daily Summary", "type": "main", "index": 0 }]]
+    }
+  },
+
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "n8n_version": "1.0.0"
+  }
+}
