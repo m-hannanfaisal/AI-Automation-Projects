@@ -1,8 +1,26 @@
-# AI Automation Portfolio — Hannan Faisal
+<div align="center">
 
-> **n8n · Groq · OpenAI · Python · RAG **
->
-> A collection of production-ready AI automation workflows and systems built to solve real business problems — from lead generation to invoice processing to autonomous hiring pipelines. Each project is importable, documented, and freelance-deployable.
+# AI Automation Portfolio
+
+**Building production-grade AI pipelines that eliminate manual work**
+
+[![n8n](https://img.shields.io/badge/n8n-Workflow%20Automation-EA4B71?style=flat-square&logo=n8n&logoColor=white)](https://n8n.io)
+[![OpenAI](https://img.shields.io/badge/OpenAI-GPT--4o-412991?style=flat-square&logo=openai&logoColor=white)](https://openai.com)
+[![Groq](https://img.shields.io/badge/Groq-LLaMA%203.3-F55036?style=flat-square)](https://groq.com)
+[![Google Gemini](https://img.shields.io/badge/Google-Gemini-4285F4?style=flat-square&logo=google&logoColor=white)](https://deepmind.google/technologies/gemini/)
+[![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-Backend-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+
+[![Projects](https://img.shields.io/badge/Projects-11-brightgreen?style=flat-square)](#project-index)
+[![License](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](LICENSE)
+[![Freelance](https://img.shields.io/badge/Status-Available%20for%20Hire-success?style=flat-square)](mailto:hannanfaisal0507@gmail.com)
+[![Email](https://img.shields.io/badge/Contact-hannanfaisal0507%40gmail.com-D14836?style=flat-square&logo=gmail&logoColor=white)](mailto:hannanfaisal0507@gmail.com)
+
+</div>
+
+---
+
+A collection of production-ready AI automation workflows and systems built to solve real business problems — from lead generation to invoice processing to autonomous hiring pipelines. Each project is importable, documented, and freelance-deployable.
 
 ---
 
@@ -16,7 +34,21 @@ This repository documents my journey learning AI automation — from a first con
 - Documented setup guides for each integration
 - Projects ranging from beginner logic to production-grade multi-flow pipelines
 
-**Stack I work with:** n8n · Groq (LLaMA 3.3) · OpenAI (GPT-4o) · Google Gemini · Python · FastAPI · ChromaDB · Apify · HubSpot · Meta Cloud API · LinkedIn API · Google Workspace APIs · Twilio
+**Stack I work with:**
+
+[![n8n](https://img.shields.io/badge/n8n-EA4B71?style=flat-square&logo=n8n&logoColor=white)](https://n8n.io)
+[![Groq](https://img.shields.io/badge/Groq%20LLaMA%203.3-F55036?style=flat-square)](https://groq.com)
+[![OpenAI](https://img.shields.io/badge/OpenAI%20GPT--4o-412991?style=flat-square&logo=openai&logoColor=white)](https://openai.com)
+[![Gemini](https://img.shields.io/badge/Google%20Gemini-4285F4?style=flat-square&logo=google&logoColor=white)](https://deepmind.google/technologies/gemini/)
+[![Python](https://img.shields.io/badge/Python-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![ChromaDB](https://img.shields.io/badge/ChromaDB-Vector%20DB-FF6B35?style=flat-square)](https://www.trychroma.com)
+[![Apify](https://img.shields.io/badge/Apify-Web%20Scraping-00C05B?style=flat-square)](https://apify.com)
+[![HubSpot](https://img.shields.io/badge/HubSpot-FF7A59?style=flat-square&logo=hubspot&logoColor=white)](https://hubspot.com)
+[![WhatsApp](https://img.shields.io/badge/Meta%20Cloud%20API-25D366?style=flat-square&logo=whatsapp&logoColor=white)](https://developers.facebook.com/docs/whatsapp)
+[![LinkedIn](https://img.shields.io/badge/LinkedIn%20API-0A66C2?style=flat-square&logo=linkedin&logoColor=white)](https://linkedin.com)
+[![Google Workspace](https://img.shields.io/badge/Google%20Workspace-4285F4?style=flat-square&logo=google&logoColor=white)](https://workspace.google.com)
+[![Twilio](https://img.shields.io/badge/Twilio-F22F46?style=flat-square&logo=twilio&logoColor=white)](https://twilio.com)
 
 ---
 
@@ -46,6 +78,11 @@ This repository documents my journey learning AI automation — from a first con
 
 📁 [`AI-Cold-Outreach-System/`](./AI-Cold-Outreach-System)
 
+![n8n](https://img.shields.io/badge/n8n-EA4B71?style=flat-square&logo=n8n&logoColor=white)
+![Gemini](https://img.shields.io/badge/Gemini%201.5%20Flash-4285F4?style=flat-square&logo=google&logoColor=white)
+![Gmail](https://img.shields.io/badge/Gmail%20API-D14836?style=flat-square&logo=gmail&logoColor=white)
+![Google Sheets](https://img.shields.io/badge/Google%20Sheets-34A853?style=flat-square&logo=google-sheets&logoColor=white)
+
 **The problem:** Sales teams spend hours writing personalized cold emails one by one. Generic templates get ignored. The gap between personalization and scale is where deals are lost.
 
 **What it does:** Pulls `Pending` leads from a Google Sheet, sends each one to Gemini AI which writes a fully personalized subject line and email body based on that lead's company, role, and industry — then sends via Gmail, updates the sheet status, waits between sends to respect rate limits, and loops to the next lead. A separate webhook flow listens for replies and automatically updates the lead status to `Replied`.
@@ -54,7 +91,8 @@ This repository documents my journey learning AI automation — from a first con
 Google Sheets (Pending leads)
         ↓
 Validate lead data (email + name present?)
-        ↓ yes                    ↓ no
+        ↓
+yes                    ↓ no
 AI Personalization          Flag as Invalid - Skipped
 (Gemini writes email)              ↓
         ↓               Update sheet → stop
@@ -65,9 +103,11 @@ Update sheet → Sent + timestamp
 Wait 30s (rate limit safe)
         ↓
 Loop to next lead
-        ↓ (separate webhook flow)
+        ↓
+(separate webhook flow)
 Reply received → Update sheet → Replied
-        ↓ (error handler)
+        ↓
+(error handler)
 Any failure → Instant alert email
 ```
 
@@ -77,8 +117,6 @@ Any failure → Instant alert email
 - Two-way sheet sync: `Pending → Sent → Replied` or `Invalid - Skipped` — nothing falls silent
 - Built-in error alerting: any node failure sends an email with the failing node name and execution ID
 
-**Tech stack:** n8n · Google Gemini (gemini-1.5-flash) · Gmail API · Google Sheets API · JavaScript
-
 **Who buys this:** Sales agencies, SaaS companies, freelancers doing B2B outreach
 
 ---
@@ -86,6 +124,11 @@ Any failure → Instant alert email
 ### 2. Hiring Signal Lead Engine
 
 📁 [`Hiring-Signal-Lead-Engine/`](./Hiring-Signal-Lead-Engine)
+
+![n8n](https://img.shields.io/badge/n8n-EA4B71?style=flat-square&logo=n8n&logoColor=white)
+![Apify](https://img.shields.io/badge/Apify-00C05B?style=flat-square)
+![OpenAI](https://img.shields.io/badge/GPT--4o--mini-412991?style=flat-square&logo=openai&logoColor=white)
+![Google Sheets](https://img.shields.io/badge/Google%20Sheets-34A853?style=flat-square&logo=google-sheets&logoColor=white)
 
 **The problem:** Companies that are actively hiring signal a budget and a business need. Sales teams that can identify those signals before competitors do win the deal. But manually scanning job boards every day doesn't scale.
 
@@ -123,8 +166,6 @@ Send to sales inbox via Gmail
 - Zero-results alerting — instead of going silently stale when a source changes structure, an alert fires immediately
 - Transparent scoring — every lead has a visible reasoning string so a human can sanity-check the AI's judgment
 
-**Tech stack:** n8n · Apify · OpenAI (gpt-4o-mini) · Google Sheets · Gmail
-
 **Who buys this:** B2B sales teams, recruitment agencies, market intelligence teams
 
 ---
@@ -132,6 +173,11 @@ Send to sales inbox via Gmail
 ### 3. CV Screening Engine
 
 📁 [`Cv_screening_engine/`](./Cv_screening_engine)
+
+![n8n](https://img.shields.io/badge/n8n-EA4B71?style=flat-square&logo=n8n&logoColor=white)
+![OpenAI](https://img.shields.io/badge/GPT--4o--mini-412991?style=flat-square&logo=openai&logoColor=white)
+![GitHub](https://img.shields.io/badge/GitHub%20API-181717?style=flat-square&logo=github&logoColor=white)
+![Google Sheets](https://img.shields.io/badge/Google%20Sheets-34A853?style=flat-square&logo=google-sheets&logoColor=white)
 
 **The problem:** HR teams receive hundreds of applications per role. Reading every CV manually to shortlist 10 candidates is a full day of work — often done inconsistently depending on who's reviewing.
 
@@ -144,14 +190,12 @@ Has CV attachment? → No → drop
         ↓ Yes
 Extract CV text from PDF
         ↓
-GPT-4o-mini → structured fields
-(name, email, skills, experience, GitHub URL)
+GPT-4o-mini → structured fields (name, email, skills, experience, GitHub URL)
         ↓
 Has GitHub URL?
-   ↓ Yes                    ↓ No
+    ↓ Yes                    ↓ No
 Fetch GitHub profile    GitHub score = 0
-Compute signal score
-(repos, activity, languages, followers, docs)
+Compute signal score (repos, activity, languages, followers, docs)
         ↓
 GPT-4o-mini final score (0–10)
 Skills match (0–4) + Experience (0–3) + GitHub (0–3)
@@ -171,8 +215,6 @@ Build HTML digest → email HR
 
 > ⚠️ Screening aid only — all scores include human-readable reasoning and are meant to help a reviewer prioritize, not replace their judgment.
 
-**Tech stack:** n8n · OpenAI GPT-4o-mini · GitHub API · Gmail · Google Sheets
-
 **Who buys this:** HR departments, recruitment agencies, fast-growing startups with high application volume
 
 ---
@@ -180,6 +222,11 @@ Build HTML digest → email HR
 ### 4. WhatsApp AI Booking Bot
 
 📁 [`WhatsApp AI Agent/`](./WhatsApp%20AI%20Agent)
+
+![n8n](https://img.shields.io/badge/n8n-EA4B71?style=flat-square&logo=n8n&logoColor=white)
+![Meta](https://img.shields.io/badge/Meta%20Cloud%20API-0082FB?style=flat-square&logo=meta&logoColor=white)
+![Groq](https://img.shields.io/badge/Groq%20LLaMA%203.3%2070B-F55036?style=flat-square)
+![Google Calendar](https://img.shields.io/badge/Google%20Calendar-4285F4?style=flat-square&logo=google-calendar&logoColor=white)
 
 **The problem:** Local businesses — clinics, salons, tutors, real estate agents — receive dozens of "are you available Friday at 3pm?" messages daily on WhatsApp. Answering each one manually takes 2–3 hours that nobody has.
 
@@ -193,17 +240,17 @@ Extract sender, message text, phone number
 Skip verification pings + status updates
         ↓
 Booking intent? (regex keyword detection)
-   ↓ Yes                         ↓ No
+    ↓ Yes                         ↓ No
 Groq — extract date/time     Groq — chat reply
 Snap to 30-min slot               ↓
         ↓                   Send reply → done
 Valid datetime?
-   ↓ Yes        ↓ No
+    ↓ Yes        ↓ No
 Google Cal   Ask for
 check        clarification
-   ↓
+    ↓
 Slot free?
-   ↓ Yes      ↓ No
+    ↓ Yes      ↓ No
 Create event  Busy message
 Confirmation
         ↓
@@ -217,8 +264,6 @@ Meta API → send WhatsApp reply
 - Auto-rounds "2:10pm" to 14:00, "2:20pm" to 14:30
 - Sunday requests rejected gracefully with alternative suggestion
 
-**Tech stack:** n8n · Meta Cloud API · Groq (LLaMA 3.3 70B) · Google Calendar API · Cloudflare Tunnel
-
 **Who buys this:** Every local business that books appointments via WhatsApp — clinics, salons, tutors, fitness trainers, real estate agents
 
 ---
@@ -226,6 +271,11 @@ Meta API → send WhatsApp reply
 ### 5. AI Invoice Processor
 
 📁 [`AI-Invoice-Processor/`](./AI-Invoice-Processor)
+
+![n8n](https://img.shields.io/badge/n8n-EA4B71?style=flat-square&logo=n8n&logoColor=white)
+![Groq](https://img.shields.io/badge/Groq%20LLaMA%203.3%2070B-F55036?style=flat-square)
+![Gmail](https://img.shields.io/badge/Gmail%20API-D14836?style=flat-square&logo=gmail&logoColor=white)
+![Google Sheets](https://img.shields.io/badge/Google%20Sheets-34A853?style=flat-square&logo=google-sheets&logoColor=white)
 
 **The problem:** Accountants and finance teams at SMBs receive 50–200 invoices per month by email. Manually copying vendor name, amounts, dates, and line items from PDFs into spreadsheets takes 3–5 minutes per invoice — up to 16 hours of work per month.
 
@@ -242,16 +292,14 @@ Groq (LLaMA 3.3) — extract 16 invoice fields
         ↓
 Parse + validate (vendor + total + date present?)
         ↓
-   Valid?
-   ↓ Yes                    ↓ No
+    Valid?
+    ↓ Yes                    ↓ No
 Log to Invoices sheet    Log to Errors sheet
-Send confirmation        Send alert email
-to vendor                (what's missing)
+Send confirmation        Send alert email to vendor
+                         (what's missing)
 ```
 
 **Fields extracted:** Invoice number, invoice date, due date, vendor name, vendor email, vendor address, bill-to, subtotal, tax amount, tax rate, total amount, currency, payment terms, line items, notes, AI confidence score
-
-**Tech stack:** n8n · Groq (LLaMA 3.3 70B) · Gmail · Google Sheets · n8n Extract From File node
 
 **Who buys this:** Accountants, finance managers at SMBs, bookkeeping firms, e-commerce businesses
 
@@ -260,6 +308,11 @@ to vendor                (what's missing)
 ### 6. Lead Capture & CRM Pipeline
 
 📁 [`AI-Powered Lead Capture & CRM Automation Pipeline/`](./AI-Powered%20Lead%20Capture%20%26%20CRM%20Automation%20Pipeline)
+
+![n8n](https://img.shields.io/badge/n8n-EA4B71?style=flat-square&logo=n8n&logoColor=white)
+![Groq](https://img.shields.io/badge/Groq%20LLaMA%203.3%2070B-F55036?style=flat-square)
+![HubSpot](https://img.shields.io/badge/HubSpot-FF7A59?style=flat-square&logo=hubspot&logoColor=white)
+![Slack](https://img.shields.io/badge/Slack-4A154B?style=flat-square&logo=slack&logoColor=white)
 
 **The problem:** Inbound leads die in email inboxes. Someone submits a contact form, and by the time a human reads it, categorizes it, adds it to the CRM, sends an acknowledgment, and notifies the sales team — an hour has passed. Response time is one of the biggest predictors of conversion.
 
@@ -270,8 +323,7 @@ Form submitted → Webhook
         ↓
 Normalize fields (name, email, phone, company, message)
         ↓
-Groq — AI qualification
-(Hot/Warm/Cold · priority 1–10 · reason · follow-up suggestion)
+Groq — AI qualification (Hot/Warm/Cold · priority 1–10 · reason · follow-up suggestion)
         ↓
 Parse AI score + merge with lead data
         ↓
@@ -282,8 +334,6 @@ Fan out in parallel:
 └── Google Sheets → Log all fields + score
 ```
 
-**Tech stack:** n8n · Groq (LLaMA 3.3 70B) · HubSpot API · Gmail · Slack · Google Sheets
-
 **Who buys this:** Sales teams, marketing agencies, SaaS companies with inbound lead flow, coaches and consultants
 
 ---
@@ -292,6 +342,11 @@ Fan out in parallel:
 
 📁 [`AI-SocialMedia-Pipeline/`](./AI-SocialMedia-Pipeline)
 
+![n8n](https://img.shields.io/badge/n8n-EA4B71?style=flat-square&logo=n8n&logoColor=white)
+![Groq](https://img.shields.io/badge/Groq%20LLaMA%203.3%2070B-F55036?style=flat-square)
+![LinkedIn](https://img.shields.io/badge/LinkedIn%20API-0A66C2?style=flat-square&logo=linkedin&logoColor=white)
+![WordPress](https://img.shields.io/badge/WordPress%20REST%20API-21759B?style=flat-square&logo=wordpress&logoColor=white)
+
 **The problem:** Staying consistent on LinkedIn and a blog requires 3–5 hours of content work per week — research, writing, formatting, publishing. Most creators either burn out or go silent.
 
 **What it does:** Every morning at 9AM, Groq picks a fresh Personal Finance topic with a unique angle (ensuring no repeats), writes a full LinkedIn post with hook + hashtags and a 400–600 word blog article with SEO title and meta description, publishes both via the LinkedIn UGC API and WordPress REST API, logs everything to Google Sheets as a content library, and emails a formatted HTML summary of what went live.
@@ -299,11 +354,9 @@ Fan out in parallel:
 ```
 Schedule Trigger (9AM Mon-Sat)
         ↓
-Groq — pick today's unique topic
-(angle, content type, target emotion)
+Groq — pick today's unique topic (angle, content type, target emotion)
         ↓
-Groq — write all content
-(LinkedIn post + blog article + hashtags + SEO)
+Groq — write all content (LinkedIn post + blog article + hashtags + SEO)
         ↓
 Parse + clean all content
         ↓
@@ -315,10 +368,8 @@ Fan out in parallel:
 Gmail → HTML daily summary email
 ```
 
-**Niche:** Personal Finance & Investing (configurable to any niche)
+**Niche:** Personal Finance & Investing (configurable to any niche)  
 **Output per run:** 1 LinkedIn post (150–250 words) + 1 blog article (400–600 words) + 10 hashtags + SEO meta
-
-**Tech stack:** n8n · Groq (LLaMA 3.3 70B) · LinkedIn API · WordPress REST API · Google Sheets · Gmail
 
 **Who buys this:** Content creators, personal finance educators, marketing agencies managing multiple LinkedIn accounts
 
@@ -330,9 +381,14 @@ Gmail → HTML daily summary email
 
 > *First RAG implementation — built to learn the full retrieval-augmented generation stack from scratch.*
 
+![Python](https://img.shields.io/badge/Python-3776AB?style=flat-square&logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white)
+![ChromaDB](https://img.shields.io/badge/ChromaDB-FF6B35?style=flat-square)
+![Gemini](https://img.shields.io/badge/Google%20Gemini-4285F4?style=flat-square&logo=google&logoColor=white)
+
 **The problem:** Generic AI chatbots hallucinate answers about your specific business. A customer asking about your refund policy or pricing should get answers from your actual documents, not from the AI's training data.
 
-**What it does:** A Python backend that ingests a folder of company documents (about, FAQ, pricing, services, careers, contact, terms, privacy), chunks and embeds them using `all-MiniLM-L6-v2` into a persistent ChromaDB vector database, and at query time retrieves the top-3 most relevant chunks, builds a context-grounded prompt, and sends it to Google Gemini which answers using only the provided context. A FastAPI endpoint exposes the chat interface, and a simple HTML frontend provides the UI.
+**What it does:** A Python backend that ingests a folder of company documents (about, FAQ, pricing, services, careers, contact, terms, privacy), chunks and embeds them using `all-MiniLM-L6-v2` into a persistent ChromaDB vector database, and at query time retrieves the top-3 most relevant chunks, builds a context-grounded prompt, and sends it to Google Gemini which answers using only the provided context.
 
 ```
 Documents (markdown files)
@@ -367,8 +423,6 @@ basic_RAG_chatbot/
     └── chat_ui.html    Simple browser chat interface
 ```
 
-**Tech stack:** Python · FastAPI · ChromaDB · SentenceTransformers · LangChain · Google Gemini · HTML/CSS
-
 **What I learned:** Full RAG pipeline from scratch — document chunking strategy, embedding models, vector similarity search, context window management, and grounding LLM responses to a knowledge base.
 
 ---
@@ -379,26 +433,32 @@ basic_RAG_chatbot/
 
 > *Production RAG chatbot delivered as an internship project for a real client in the smart home and energy management industry.*
 
+![Python](https://img.shields.io/badge/Python-3776AB?style=flat-square&logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white)
+![Gemini](https://img.shields.io/badge/Gemini%202.5%20Flash-4285F4?style=flat-square&logo=google&logoColor=white)
+![SQLite](https://img.shields.io/badge/SQLite-003B57?style=flat-square&logo=sqlite&logoColor=white)
+![JavaScript](https://img.shields.io/badge/Vanilla%20JS-F7DF1E?style=flat-square&logo=javascript&logoColor=black)
+
 **The problem:** Generic AI chatbots can't answer questions about a company's specific products, pricing, or policies — they hallucinate. Elsa Energy needed a chatbot that could answer customer queries strictly from their own knowledge base, and drop into their existing Laravel web app with minimal integration effort.
 
-**What it does:** A Python FastAPI microservice ingests the client's knowledge documents, chunks and embeds them using the Gemini Embedding API, and stores them in a lightweight SQLite vector store (no C++ dependencies, no Docker). At query time, the user's message is embedded, cosine similarity is computed in pure Python against all stored chunks, and the top-3 most relevant chunks are injected into a dynamic system prompt sent to Gemini 2.5 Flash — which answers only from that context. A plug-and-play frontend widget (Glassmorphism design, single `<script>` tag to embed) connects to the API and maintains full conversation history per session.
+**What it does:** A Python FastAPI microservice ingests the client's knowledge documents, chunks and embeds them using the Gemini Embedding API, and stores them in a lightweight SQLite vector store (no C++ dependencies, no Docker). At query time, cosine similarity is computed in pure Python against all stored chunks, and the top-3 most relevant chunks are injected into a dynamic system prompt sent to Gemini 2.5 Flash.
 
 ```
 User message
-      │
-      ▼
+        │
+        ▼
 [Embed query] ──→ Gemini Embedding API (gemini-embedding-001)
-      │
-      ▼
+        │
+        ▼
 [Cosine similarity search] ──→ SQLite vector_store.db
-      │
-      ▼
+        │
+        ▼
 [Top-3 chunks retrieved]
-      │
-      ▼
+        │
+        ▼
 [Dynamic system prompt] ──→ Gemini 2.5 Flash
-      │
-      ▼
+        │
+        ▼
 [Grounded answer returned to frontend widget]
 ```
 
@@ -422,8 +482,6 @@ elsa-RAG-chatbot/
 - `/ingest` API route — allows re-ingestion of the knowledge base at runtime without restarting the server
 - Laravel-ready proxy pattern documented — one route + two asset copies and the widget is live
 
-**Tech stack:** Python · FastAPI · Google Gemini 2.5 Flash · Gemini Embedding API · SQLite · Vanilla JS · HTML5/CSS3
-
 **Who buys this:** SMBs with product/support knowledge bases, SaaS companies, client-facing businesses that need a branded AI assistant without hallucinations
 
 ---
@@ -433,6 +491,10 @@ elsa-RAG-chatbot/
 📁 [`code_summarizer/`](./code_summarizer)
 
 > *A beginner automation built while learning n8n — showcasing multi-branch AI orchestration and Gmail integration.*
+
+![n8n](https://img.shields.io/badge/n8n-EA4B71?style=flat-square&logo=n8n&logoColor=white)
+![OpenAI](https://img.shields.io/badge/OpenAI-412991?style=flat-square&logo=openai&logoColor=white)
+![Gmail](https://img.shields.io/badge/Gmail%20API-D14836?style=flat-square&logo=gmail&logoColor=white)
 
 **The problem:** Developers submitting code snippets for review or documentation need both inline comments and a plain-English summary — two different outputs that would normally require two separate manual steps.
 
@@ -456,8 +518,6 @@ Aggregate Node → format final response
 Gmail → send result back to sender
 ```
 
-**Tech stack:** n8n · OpenAI · Gmail Trigger · AI Chain Nodes · Merge Node · Aggregate Node · Gmail
-
 **What I learned:** Multi-branch n8n workflows, parallel AI chain execution, merging divergent workflow paths, and formatting AI-generated output for delivery.
 
 ---
@@ -468,11 +528,12 @@ Gmail → send result back to sender
 
 > *My first automation — built while learning n8n fundamentals. Kept here to show where this journey started.*
 
+![n8n](https://img.shields.io/badge/n8n-EA4B71?style=flat-square&logo=n8n&logoColor=white)
+![Google Sheets](https://img.shields.io/badge/Google%20Sheets-34A853?style=flat-square&logo=google-sheets&logoColor=white)
+
 **What it does:** A customer submits a feedback form. The workflow evaluates the submission using an IF node. If conditions are met, a discount is assigned. The result is appended to Google Sheets.
 
 Simple as it is, this project taught me the fundamentals that every project above is built on: triggers, conditional branching, data mapping, and external integrations.
-
-**Tech stack:** n8n · Form Trigger · IF Node · Set Node · Google Sheets
 
 ---
 
@@ -584,15 +645,22 @@ This repo is structured for easy extension. When you add a new project:
 
 ## Contact
 
-**Hannan Faisal** — AI Automation Specialist 
-Reach me at hannanfaisal0507@gmail.com
+<div align="center">
 
-Available for freelance projects.
+**Hannan Faisal** — AI Automation Specialist
+
+[![Email](https://img.shields.io/badge/Email-hannanfaisal0507%40gmail.com-D14836?style=for-the-badge&logo=gmail&logoColor=white)](mailto:hannanfaisal0507@gmail.com)
+
+**Available for freelance projects**
 
 Specializing in: n8n workflow automation · LLM integrations · WhatsApp bots · Lead generation systems · AI-powered document processing · RAG chatbots
+
+</div>
 
 ---
 
 ## License
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)](LICENSE)
 
 MIT License — free to use, adapt, and deploy for client projects.
